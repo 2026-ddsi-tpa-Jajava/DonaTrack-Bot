@@ -45,7 +45,7 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
                 case "/donador" -> """
                         Modo donador seleccionado. 
                         Comandos disponibles:
-                        - /stats <tu_id> : Consultá tus puntos, nivel e insignias.
+                        - /stats ID : Consultá tus puntos, nivel e insignias (ejemplo: /stats 2).
                         """;
                 case "/admin" -> "Modo admin seleccionado. Próximos comandos: ABM entidades y necesidades.";
                 default -> "Comando no reconocido. Usá /start para ver opciones.";
@@ -53,6 +53,7 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
         }
 
         SendMessage message = new SendMessage(chatId.toString(), response);
+        message.enableMarkdown(true);
         try {
             execute(message);
         } catch (TelegramApiException exception) {
