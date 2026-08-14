@@ -1,0 +1,16 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "java",
+      "name": "DonaTrackBotApplication",
+      "request": "launch",
+      "mainClass": "ar.edu.utn.dds.k3003.DonaTrackBotApplication",
+      "projectName": "donatrack-bot",
+      "env": {
+        "TOKEN_BOT": "8895872249:AAES3rdDmXdvDlDToFnf64puR4otTBW6V54",
+        "NOMBRE_BOT": "Donatrack22_bot"
+      }
+    }
+  ]
+}
