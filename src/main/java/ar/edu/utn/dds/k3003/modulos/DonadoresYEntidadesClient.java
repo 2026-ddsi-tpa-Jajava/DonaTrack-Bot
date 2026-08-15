@@ -16,36 +16,37 @@ import com.fasterxml.jackson.databind.JsonNode;
 /**
  * Cliente HTTP hacia el módulo "Donadores y Entidades".
  *
- * Endpoints ya disponibles (según lo que compartió el compañero, 21/08):
- *   GET  /donadores/{id}/estadisticas
- *   POST /donadores
- *   GET  /donadores
- *   GET  /donadores/{id}
- *   POST /entidades
- *   GET  /entidades
- *   GET  /entidades/{id}
- *   POST /necesidades
- *   GET  /necesidades?productoID={id}
- *
- * Endpoints que la consigna pide pero TODAVÍA NO están expuestos del otro lado
- * (quedan como TODO hasta que el compañero los suba):
- *   PUT    /entidades/{id}          (editar entidad)
- *   DELETE /necesidades/{id}        (borrar necesidad)
- *   PUT    /necesidades/{id}        (modificar necesidad)
- *   GET    /necesidades/{id}        (consultar necesidad por ID)
+ * Endpoints disponibles:
+ *   GET    /donadores/{id}/estadisticas
+ *   POST   /donadores
+ *   GET    /donadores
+ *   GET    /donadores/{id}
+ *   POST   /entidades
+ *   GET    /entidades
+ *   GET    /entidades/{id}
+ *   PATCH  /entidades/{id}
+ *   POST   /necesidades
+ *   GET    /necesidades?productoID={id}
+ *   GET    /necesidades/{id}
+ *   PATCH  /necesidades/{id}
+ *   DELETE /necesidades/{id}
  */
 @Component
 public class DonadoresYEntidadesClient {
 
     private final RestClient restClient;
+    private final IncentivosClient incentivosClient;
 
     public DonadoresYEntidadesClient(
-        @Value("${donadoresyentidades.url:https://agusb1101-donadores-entidades.onrender.com}") String baseUrl) {
-    
-    // Le damos una URL segura por si baseUrl llega a venir nulo
+        @Value("${donadoresyentidades.url:https://agusb1101-donadores-entidades.onrender.com}") String baseUrl,
+        IncentivosClient incentivosClient) {
+        
     String urlSegura = (baseUrl != null) ? baseUrl : "https://agusb1101-donadores-entidades.onrender.com";
-    this.restClient = RestClient.create(urlSegura);
-    }
+    
+    // Acá aplicamos el requireNonNull para que el IDE deje de molestar
+    this.restClient = RestClient.create(java.util.Objects.requireNonNull(urlSegura));
+    this.incentivosClient = incentivosClient;
+}
 
     // ==================== DONADORES ====================
 
@@ -159,11 +160,25 @@ public class DonadoresYEntidadesClient {
         }
     }
 
-    public String editarEntidad(String id, String razonSocial, String domicilio,
-                                 String telefono, String correo) {
-        // TODO: falta que el compañero exponga PUT /entidades/{id}.
-        return "⚠️ Editar entidad todavía no está disponible: falta el endpoint del lado de "
-                + "Donadores y Entidades (PUT /entidades/{id}).";
+    public String editarEntidad(String id, Map<String, Object> camposAModificar) {
+        try {
+            // Mandamos directamente el mapa. 
+            // Jackson (por debajo) lo convierte al JSON exacto con los campos recibidos.
+            JsonNode editada = restClient.patch()
+                    .uri("/entidades/{id}", id)
+                    .body(java.util.Objects.requireNonNull(camposAModificar))
+                    .retrieve()
+                    .body(JsonNode.class);
+
+            return "✅ Entidad actualizada correctamente.\n\n" + formatearEntidad(editada);
+        } catch (RestClientResponseException e) {
+            if (e.getStatusCode().value() == 404) {
+                return "No encontramos ninguna entidad con ese ID.";
+            }
+            return "❌ No se pudo editar la entidad (HTTP " + e.getStatusCode().value() + ").";
+        } catch (Exception e) {
+            return "⚠️ No nos pudimos comunicar con el módulo de Donadores y Entidades.";
+        }
     }
 
     public String consultarEntidades() {
@@ -260,21 +275,57 @@ public class DonadoresYEntidadesClient {
     }
 
     public String borrarNecesidad(String id) {
-        // TODO: falta que el compañero exponga DELETE /necesidades/{id}.
-        return "⚠️ Borrar necesidad todavía no está disponible: falta el endpoint del lado de "
-                + "Donadores y Entidades (DELETE /necesidades/{id}).";
+        try {
+            restClient.delete()
+                    .uri("/necesidades/{id}", id)
+                    .retrieve()
+                    .toBodilessEntity();
+            return "🗑️ Necesidad *" + id + "* borrada correctamente.";
+        } catch (RestClientResponseException e) {
+            if (e.getStatusCode().value() == 404) {
+                return "No encontramos ninguna necesidad con ese ID.";
+            }
+            return "❌ No se pudo borrar la necesidad (HTTP " + e.getStatusCode().value() + ").";
+        } catch (Exception e) {
+            return "⚠️ No nos pudimos comunicar con el módulo de Donadores y Entidades.";
+        }
     }
 
-    public String modificarNecesidad(String id, String descripcion) {
-        // TODO: falta que el compañero exponga PUT /necesidades/{id}.
-        return "⚠️ Modificar necesidad todavía no está disponible: falta el endpoint del lado de "
-                + "Donadores y Entidades (PUT /necesidades/{id}).";
+    public String modificarNecesidad(String id, Map<String, Object> camposAModificar) {
+        try {
+            JsonNode editada = restClient.patch()
+                    .uri("/necesidades/{id}", id)
+                    .body(java.util.Objects.requireNonNull(camposAModificar))
+                    .retrieve()
+                    .body(JsonNode.class);
+
+            String idNec = (editada != null) ? editada.path("id").asText(id) : id;
+            return "✅ Necesidad *" + idNec + "* actualizada correctamente.";
+        } catch (RestClientResponseException e) {
+            if (e.getStatusCode().value() == 404) {
+                return "No encontramos ninguna necesidad con ese ID.";
+            }
+            return "❌ No se pudo modificar la necesidad (HTTP " + e.getStatusCode().value() + ").";
+        } catch (Exception e) {
+            return "⚠️ No nos pudimos comunicar con el módulo de Donadores y Entidades.";
+        }
     }
 
     public String consultarNecesidadPorId(String id) {
-        // TODO: falta que el compañero exponga GET /necesidades/{id} (hoy solo existe por productoID).
-        return "⚠️ Consultar necesidad por ID todavía no está disponible: falta el endpoint del lado de "
-                + "Donadores y Entidades (GET /necesidades/{id}).";
+        try {
+            JsonNode n = restClient.get()
+                    .uri("/necesidades/{id}", id)
+                    .retrieve()
+                    .body(JsonNode.class);
+            return formatearNecesidad(n);
+        } catch (RestClientResponseException e) {
+            if (e.getStatusCode().value() == 404) {
+                return "No encontramos ninguna necesidad con ese ID.";
+            }
+            return "❌ Error al consultar la necesidad (HTTP " + e.getStatusCode().value() + ").";
+        } catch (Exception e) {
+            return "⚠️ No nos pudimos comunicar con el módulo de Donadores y Entidades.";
+        }
     }
 
     // ==================== Formateo ====================
@@ -303,15 +354,29 @@ public class DonadoresYEntidadesClient {
         ).append("\n");
 
         JsonNode insignias = d.path("insigniasID");
-        sb.append("🏅 Insignias: ");
+        sb.append("🏅 *Insignias obtenidas:*");
         if (insignias.isArray() && !insignias.isEmpty()) {
+            sb.append("\n\n");
             List<String> ids = new ArrayList<>();
             insignias.forEach(i -> ids.add(i.asText()));
-            sb.append(String.join(", ", ids));
+
+            ids.sort((a, b) -> {
+                try {
+                    int numA = Integer.parseInt(a.replaceAll("\\D+", ""));
+                    int numB = Integer.parseInt(b.replaceAll("\\D+", ""));
+                    return Integer.compare(numA, numB);
+                } catch (NumberFormatException e) {
+                    return a.compareTo(b);
+                }
+            });
+
+            for (String insigniaId : ids) {
+                sb.append("• ").append(incentivosClient.obtenerDetalleInsignia(insigniaId)).append("\n\n");
+            }
         } else {
-            sb.append("ninguna todavía");
+            sb.append("\nNinguna todavía.\n");
         }
-        return sb.toString();
+        return sb.toString().trim();
     }
 
     private String formatearEntidad(JsonNode e) {
@@ -323,5 +388,18 @@ public class DonadoresYEntidadesClient {
                 + "Domicilio: " + e.path("domicilio").asText("-") + "\n"
                 + "Teléfono: " + e.path("telefono").asText("-") + "\n"
                 + "Correo: " + e.path("correo").asText("-");
+    }
+
+    private String formatearNecesidad(JsonNode n) {
+        if (n == null) {
+            return "Necesidad no encontrada.";
+        }
+        return "📋 *" + n.path("descripcion").asText("") + "*\n"
+                + "ID: " + n.path("id").asText("?") + "\n"
+                + "Entidad: " + n.path("entidadID").asText("-") + "\n"
+                + "Producto solicitado: " + n.path("productoSolicitadoID").asText("-") + "\n"
+                + "Cantidad objetivo: " + n.path("cantidadObjetivo").asText("-") + "\n"
+                + "Nivel de urgencia: " + n.path("nivelDeUrgencia").asText("-") + "\n"
+                + "Tipo: " + n.path("tipo").asText("-");
     }
 }

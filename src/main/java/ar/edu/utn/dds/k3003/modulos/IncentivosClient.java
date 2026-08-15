@@ -90,7 +90,7 @@ public class IncentivosClient {
         }
     }
 
-    private String obtenerDetalleInsignia(String id) {
+    public String obtenerDetalleInsignia(String id) {
         // Extrae el número del ID (ejemplo: "ins-1" -> "1")
         String numero = id.replaceAll("\\D+", "");
         if (numero.isBlank()) {

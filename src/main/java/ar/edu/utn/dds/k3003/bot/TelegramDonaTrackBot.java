@@ -1,5 +1,7 @@
 package ar.edu.utn.dds.k3003.bot;
 
+import java.util.Map;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -185,12 +187,29 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
     }
 
     private String procesarEditarEntidad(String text) {
-        String[] campos = extraerArgumentos(text);
-        if (campos.length != 5) {
-            return "⚠️ Formato incorrecto.\nUsá: `/editarentidad ID|RazonSocial|Domicilio|Telefono|Correo`";
+        String[] partes = text.split("\\s+"); // Separa por espacios
+        
+        if (partes.length < 3) {
+            return "⚠️ Formato incorrecto.\nUsá: `/editarentidad ID campo=valor campo2=valor2`\nEjemplo: `/editarentidad 5 telefono=112233 correo=nuevo@mail.com`";
         }
-        return donadoresYEntidadesClient.editarEntidad(
-                campos[0].trim(), campos[1].trim(), campos[2].trim(), campos[3].trim(), campos[4].trim());
+        
+        String id = partes[1].trim();
+        Map<String, Object> campos = new java.util.LinkedHashMap<>();
+        
+        // Recorremos desde el tercer elemento en adelante buscando el "="
+        for (int i = 2; i < partes.length; i++) {
+            String[] claveValor = partes[i].split("=", 2);
+            if (claveValor.length == 2) {
+                campos.put(claveValor[0].trim(), claveValor[1].trim());
+            }
+        }
+        
+        if (campos.isEmpty()) {
+            return "⚠️ No se detectó ningún campo válido para modificar. Usá el formato `campo=valor`.";
+        }
+
+        // ¡Acá le mandamos el ID y el Mapa, justo lo que pide el cliente!
+        return donadoresYEntidadesClient.editarEntidad(id, campos);
     }
 
     private String procesarVerEntidad(String text) {
@@ -236,11 +255,27 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
     }
 
     private String procesarModificarNecesidad(String text) {
-        String[] campos = extraerArgumentos(text);
-        if (campos.length != 2) {
-            return "⚠️ Formato incorrecto.\nUsá: `/modificarnecesidad ID|NuevaDescripcion`";
+        String[] partes = text.split("\\s+");
+        
+        if (partes.length < 3) {
+            return "⚠️ Formato incorrecto.\nUsá: `/modificarnecesidad ID campo=valor`\nEjemplo: `/modificarnecesidad 10 descripcion=NuevasFrazadas`";
         }
-        return donadoresYEntidadesClient.modificarNecesidad(campos[0].trim(), campos[1].trim());
+        
+        String id = partes[1].trim();
+        Map<String, Object> campos = new java.util.LinkedHashMap<>();
+        
+        for (int i = 2; i < partes.length; i++) {
+            String[] claveValor = partes[i].split("=", 2);
+            if (claveValor.length == 2) {
+                campos.put(claveValor[0].trim(), claveValor[1].trim());
+            }
+        }
+
+        if (campos.isEmpty()) {
+            return "⚠️ No se detectó ningún campo válido para modificar. Usá el formato `descripcion=NuevoTexto`.";
+        }
+
+        return donadoresYEntidadesClient.modificarNecesidad(id, campos);
     }
 
     private String procesarConsultarNecesidad(String text) {
