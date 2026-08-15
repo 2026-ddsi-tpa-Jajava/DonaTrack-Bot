@@ -8,6 +8,7 @@ import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
+import ar.edu.utn.dds.k3003.modulos.DonadoresYEntidadesClient;
 import ar.edu.utn.dds.k3003.modulos.IncentivosClient;
 
 @Component
@@ -16,13 +17,16 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
     private static final Logger log = LoggerFactory.getLogger(TelegramDonaTrackBot.class);
     private final String botUsername;
     private final IncentivosClient incentivosClient;
+    private final DonadoresYEntidadesClient donadoresYEntidadesClient;
 
-    public TelegramDonaTrackBot(IncentivosClient incentivosClient) {
+    public TelegramDonaTrackBot(IncentivosClient incentivosClient,
+                                 DonadoresYEntidadesClient donadoresYEntidadesClient) {
         // Le pasamos el token directamente al constructor del padre
-        super(requireEnv("TOKEN_BOT")); 
-        
+        super(requireEnv("TOKEN_BOT"));
+
         this.botUsername = requireEnv("NOMBRE_BOT");
         this.incentivosClient = incentivosClient;
+        this.donadoresYEntidadesClient = donadoresYEntidadesClient;
     }
 
     @Override
@@ -34,23 +38,7 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
         String text = update.getMessage().getText().trim();
         log.info("[TELEGRAM_BOT] Mensaje recibido chatId={} texto={}", chatId, text);
 
-        String response;
-
-        // Manejo de comandos con parámetros como /stats <donadorId>
-        if (text.startsWith("/stats")) {
-            response = procesarComandoStats(text);
-        } else {
-            response = switch (text) {
-                case "/start" -> mensajeInicio();
-                case "/donador" -> """
-                        Modo donador seleccionado. 
-                        Comandos disponibles:
-                        - /stats ID : Consultá tus puntos, nivel e insignias (ejemplo: /stats 2).
-                        """;
-                case "/admin" -> "Modo admin seleccionado. Próximos comandos: ABM entidades y necesidades.";
-                default -> "Comando no reconocido. Usá /start para ver opciones.";
-            };
-        }
+        String response = procesarComando(text);
 
         SendMessage message = new SendMessage(chatId.toString(), response);
         message.enableMarkdown(true);
@@ -61,22 +49,41 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
         }
     }
 
-    private String procesarComandoStats(String text) {
-        String[] partes = text.split("\\s+");
-        if (partes.length < 2) {
-            return "⚠️ Por favor, indicá tu ID de donador.\nEjemplo: /stats 1";
-        }
-        String donadorId = partes[1];
-        log.info("[TELEGRAM_BOT] Consultando estado en Incentivos para donadorId={}", donadorId);
-        
-        String resultado = incentivosClient.consultarEstado(donadorId);
-        return "📊 Estado de Incentivos:\n\n" + resultado;
+    private String procesarComando(String text) {
+        String comando = text.split("\\s+", 2)[0];
+
+        return switch (comando) {
+            case "/start" -> mensajeInicio();
+            case "/donador" -> menuDonador();
+            case "/admin" -> menuAdmin();
+
+            // ---------- Incentivos (estado de gamificación puntual) ----------
+            case "/stats" -> procesarComandoStats(text);
+
+            // ---------- Donadores ----------
+            case "/registrarme" -> procesarRegistrarme(text);
+            case "/misestadisticas" -> procesarMisEstadisticas(text);
+            case "/verdonador" -> procesarVerDonador(text);
+            case "/donadores" -> donadoresYEntidadesClient.consultarDonadores();
+
+            // ---------- Entidades (admin) ----------
+            case "/crearentidad" -> procesarCrearEntidad(text);
+            case "/editarentidad" -> procesarEditarEntidad(text);
+            case "/entidades" -> donadoresYEntidadesClient.consultarEntidades();
+            case "/verentidad" -> procesarVerEntidad(text);
+
+            // ---------- Necesidades (admin) ----------
+            case "/crearnecesidad" -> procesarCrearNecesidad(text);
+            case "/necesidades" -> procesarNecesidadesPorProducto(text);
+            case "/borrarnecesidad" -> procesarBorrarNecesidad(text);
+            case "/modificarnecesidad" -> procesarModificarNecesidad(text);
+            case "/consultarnecesidad" -> procesarConsultarNecesidad(text);
+
+            default -> "Comando no reconocido. Usá /start para ver opciones.";
+        };
     }
 
-    @Override
-    public String getBotUsername() {
-        return botUsername;
-    }
+    // ==================== Menús ====================
 
     private String mensajeInicio() {
         return """
@@ -85,6 +92,183 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
             - /donador
             - /admin
             """;
+    }
+
+    private String menuDonador() {
+        return """
+            *Modo donador* 🙋
+            Comandos disponibles:
+            - /registrarme Nombre|Apellido|Edad|Email|NroDocumento|Domicilio
+            - /misestadisticas ID
+            - /verdonador ID
+            - /donadores  (lista todos)
+
+            _Ejemplo:_ `/registrarme Juan|Perez|30|juan@mail.com|30111222|Av Siempre Viva 123`
+            """;
+    }
+
+    private String menuAdmin() {
+        return """
+            *Modo admin* 🛠
+            Entidades:
+            - /crearentidad RazonSocial|Domicilio|Telefono|Correo
+            - /editarentidad ID|RazonSocial|Domicilio|Telefono|Correo
+            - /entidades  (lista todas)
+            - /verentidad ID
+
+            Necesidades:
+            - /crearnecesidad EntidadID|NivelUrgencia|Descripcion|CantidadObjetivo|ProductoID|Tipo
+            - /necesidades ProductoID
+            - /consultarnecesidad ID
+            - /modificarnecesidad ID|Descripcion
+            - /borrarnecesidad ID
+
+            _Tipo de necesidad: EXTRAORDINARIA o RECURRENTE_
+            """;
+    }
+
+    // ==================== Incentivos ====================
+
+    private String procesarComandoStats(String text) {
+        String[] partes = text.split("\\s+");
+        if (partes.length < 2) {
+            return "⚠️ Indicá el ID de donador.\nEjemplo: `/stats 1`";
+        }
+        String donadorId = partes[1];
+        log.info("[TELEGRAM_BOT] Consultando estado en Incentivos para donadorId={}", donadorId);
+        String resultado = incentivosClient.consultarEstado(donadorId);
+        return "📊 Estado de Incentivos:\n\n" + resultado;
+    }
+
+    // ==================== Donadores ====================
+
+    private String procesarRegistrarme(String text) {
+        String[] campos = extraerArgumentos(text);
+        if (campos.length != 6) {
+            return "⚠️ Formato incorrecto.\nUsá: `/registrarme Nombre|Apellido|Edad|Email|NroDocumento|Domicilio`";
+        }
+        try {
+            int edad = Integer.parseInt(campos[2].trim());
+            return donadoresYEntidadesClient.registrarDonador(
+                    campos[0].trim(), campos[1].trim(), edad,
+                    campos[3].trim(), campos[4].trim(), campos[5].trim());
+        } catch (NumberFormatException e) {
+            return "⚠️ La edad tiene que ser un número. Ejemplo: `/registrarme Juan|Perez|30|juan@mail.com|30111222|Av Siempre Viva 123`";
+        }
+    }
+
+    private String procesarMisEstadisticas(String text) {
+        String[] partes = text.split("\\s+");
+        if (partes.length < 2) {
+            return "⚠️ Indicá tu ID de donador.\nEjemplo: `/misestadisticas 1`";
+        }
+        return donadoresYEntidadesClient.consultarEstadisticas(partes[1]);
+    }
+
+    private String procesarVerDonador(String text) {
+        String[] partes = text.split("\\s+");
+        if (partes.length < 2) {
+            return "⚠️ Indicá el ID del donador.\nEjemplo: `/verdonador 1`";
+        }
+        return donadoresYEntidadesClient.consultarDonadorPorId(partes[1]);
+    }
+
+    // ==================== Entidades ====================
+
+    private String procesarCrearEntidad(String text) {
+        String[] campos = extraerArgumentos(text);
+        if (campos.length != 4) {
+            return "⚠️ Formato incorrecto.\nUsá: `/crearentidad RazonSocial|Domicilio|Telefono|Correo`";
+        }
+        return donadoresYEntidadesClient.crearEntidad(
+                campos[0].trim(), campos[1].trim(), campos[2].trim(), campos[3].trim());
+    }
+
+    private String procesarEditarEntidad(String text) {
+        String[] campos = extraerArgumentos(text);
+        if (campos.length != 5) {
+            return "⚠️ Formato incorrecto.\nUsá: `/editarentidad ID|RazonSocial|Domicilio|Telefono|Correo`";
+        }
+        return donadoresYEntidadesClient.editarEntidad(
+                campos[0].trim(), campos[1].trim(), campos[2].trim(), campos[3].trim(), campos[4].trim());
+    }
+
+    private String procesarVerEntidad(String text) {
+        String[] partes = text.split("\\s+");
+        if (partes.length < 2) {
+            return "⚠️ Indicá el ID de la entidad.\nEjemplo: `/verentidad 1`";
+        }
+        return donadoresYEntidadesClient.consultarEntidadPorId(partes[1]);
+    }
+
+    // ==================== Necesidades ====================
+
+    private String procesarCrearNecesidad(String text) {
+        String[] campos = extraerArgumentos(text);
+        if (campos.length != 6) {
+            return "⚠️ Formato incorrecto.\nUsá: `/crearnecesidad EntidadID|NivelUrgencia|Descripcion|CantidadObjetivo|ProductoID|Tipo`";
+        }
+        try {
+            int nivelUrgencia = Integer.parseInt(campos[1].trim());
+            int cantidadObjetivo = Integer.parseInt(campos[3].trim());
+            return donadoresYEntidadesClient.crearNecesidad(
+                    campos[0].trim(), nivelUrgencia, campos[2].trim(),
+                    cantidadObjetivo, campos[4].trim(), campos[5].trim().toUpperCase());
+        } catch (NumberFormatException e) {
+            return "⚠️ NivelUrgencia y CantidadObjetivo tienen que ser números.";
+        }
+    }
+
+    private String procesarNecesidadesPorProducto(String text) {
+        String[] partes = text.split("\\s+");
+        if (partes.length < 2) {
+            return "⚠️ Indicá el ID del producto.\nEjemplo: `/necesidades prod-1`";
+        }
+        return donadoresYEntidadesClient.consultarNecesidadesPorProducto(partes[1]);
+    }
+
+    private String procesarBorrarNecesidad(String text) {
+        String[] partes = text.split("\\s+");
+        if (partes.length < 2) {
+            return "⚠️ Indicá el ID de la necesidad.\nEjemplo: `/borrarnecesidad nec-1`";
+        }
+        return donadoresYEntidadesClient.borrarNecesidad(partes[1]);
+    }
+
+    private String procesarModificarNecesidad(String text) {
+        String[] campos = extraerArgumentos(text);
+        if (campos.length != 2) {
+            return "⚠️ Formato incorrecto.\nUsá: `/modificarnecesidad ID|NuevaDescripcion`";
+        }
+        return donadoresYEntidadesClient.modificarNecesidad(campos[0].trim(), campos[1].trim());
+    }
+
+    private String procesarConsultarNecesidad(String text) {
+        String[] partes = text.split("\\s+");
+        if (partes.length < 2) {
+            return "⚠️ Indicá el ID de la necesidad.\nEjemplo: `/consultarnecesidad nec-1`";
+        }
+        return donadoresYEntidadesClient.consultarNecesidadPorId(partes[1]);
+    }
+
+    // ==================== Utilidades ====================
+
+    /**
+     * Separa el comando de sus argumentos y parte los argumentos por "|".
+     * Ej: "/crearentidad Cruz Roja|Av Siempre 123|1122334455|hola@cruzroja.org"
+     *  -> ["Cruz Roja", "Av Siempre 123", "1122334455", "hola@cruzroja.org"]
+     */
+    private String[] extraerArgumentos(String text) {
+        String[] partes = text.split("\\s+", 2);
+        if (partes.length < 2 || partes[1].isBlank()) {
+            return new String[0];
+        }
+        return partes[1].split("\\|");
+    }
+
+    @Override
+    public String getBotUsername() {
+        return botUsername;
     }
 
     private static String requireEnv(String variable) {
