@@ -2,6 +2,7 @@ package ar.edu.utn.dds.k3003.bot;
 
 import java.util.Map;
 
+import ar.edu.utn.dds.k3003.modulos.LogisticaClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -20,15 +21,17 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
     private final String botUsername;
     private final IncentivosClient incentivosClient;
     private final DonadoresYEntidadesClient donadoresYEntidadesClient;
+    private final LogisticaClient logisticaClient;
 
     public TelegramDonaTrackBot(IncentivosClient incentivosClient,
-                                 DonadoresYEntidadesClient donadoresYEntidadesClient) {
+                                 DonadoresYEntidadesClient donadoresYEntidadesClient, LogisticaClient logisticaClient) {
         // Le pasamos el token directamente al constructor del padre
         super(requireEnv("TOKEN_BOT"));
 
         this.botUsername = requireEnv("NOMBRE_BOT");
         this.incentivosClient = incentivosClient;
         this.donadoresYEntidadesClient = donadoresYEntidadesClient;
+        this.logisticaClient = logisticaClient;
     }
 
     @Override
@@ -81,6 +84,22 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
             case "/modificarnecesidad" -> procesarModificarNecesidad(text);
             case "/consultarnecesidad" -> procesarConsultarNecesidad(text);
 
+            // ---------- Logística ----------
+            case "/creardeposito" -> procesarCrearDeposito(text);
+            case "/depositos" -> logisticaClient.consultarDepositos();
+            case "/deposito" -> procesarConsultarDeposito(text);
+            case "/stock" -> procesarConsultarStock(text);
+            case "/stockproducto" -> procesarConsultarStockProducto(text);
+            case "/asignaciones" -> logisticaClient.consultarAsignaciones();
+            case "/asignadas" -> logisticaClient.consultarAsignacionesPorEstado("ASIGNADA");
+            case "/completadas" -> logisticaClient.consultarAsignacionesPorEstado("COMPLETADA");
+            case "/eliminardepositos" -> logisticaClient.eliminarDepositos();
+            case "/eliminarasignaciones" -> logisticaClient.eliminarAsignaciones();
+            case "/eliminarpaquetes" -> logisticaClient.eliminarPaquetes();
+            case "/vaciarstock" -> procesarVaciarStock(text);
+            case "/configuraralgoritmo" -> procesarConfigurarAlgoritmo(text);
+            case "/asignacion" -> procesarConsultarAsignacion(text);
+
             default -> "Comando no reconocido. Usá /start para ver opciones.";
         };
     }
@@ -126,6 +145,23 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
             - /borrarnecesidad ID
 
             _Tipo de necesidad: EXTRAORDINARIA o RECURRENTE_
+            
+            Logística:
+            - /creardeposito Nombre|Direccion|Capacidad
+            - /depositos
+            - /deposito ID
+            - /stock ID
+            - /stockproducto ID
+            - /asignacion IDPAQUETE
+            - /asignaciones
+            - /asignadas
+            - /completadas
+            - /configuraralgoritmo DepositoID|SUB_ATENDIDOS
+            - /configuraralgoritmo DepositoID|PRIORIDAD_POR_SCORE
+            - /vaciarstock ID
+            - /eliminarpaquetes
+            - /eliminarasignaciones
+            - /eliminardepositos
             """;
     }
 
@@ -285,6 +321,152 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
         }
         return donadoresYEntidadesClient.consultarNecesidadPorId(partes[1]);
     }
+
+    // ==================== Logistica ====================
+
+    private String procesarCrearDeposito(String text) {
+
+        String[] campos = extraerArgumentos(text);
+
+        if (campos.length != 3) {
+
+            return """
+                ⚠️ Formato incorrecto.
+
+                Usá:
+                /creardeposito Nombre|Direccion|Capacidad
+
+                Ejemplo:
+                /creardeposito Deposito Central|Medrano 951|1000
+                """;
+        }
+
+        try {
+
+            Integer capacidad = Integer.parseInt(campos[2].trim());
+
+            return logisticaClient.crearDeposito(campos[0].trim(), campos[1].trim(), capacidad);
+
+        } catch (NumberFormatException e) {
+
+            return "⚠️ La capacidad debe ser un número.";
+
+        }
+
+    }
+
+    private String procesarConsultarDeposito(String text) {
+
+        String[] partes = text.split("\\s+");
+
+        if (partes.length < 2) {
+
+            return """
+                ⚠️ Indicá el ID del depósito.
+
+                Ejemplo:
+                /deposito 1
+                """;
+        }
+
+        return logisticaClient.consultarDepositoPorId(partes[1]);
+
+    }
+
+    private String procesarConsultarStock(String text) {
+
+        String[] partes = text.split("\\s+");
+
+        if (partes.length < 2) {
+
+            return """
+                ⚠️ Indicá el ID del depósito.
+
+                Ejemplo:
+                /stock 1
+                """;
+        }
+
+        return logisticaClient.consultarStock(partes[1]);
+
+    }
+
+    private String procesarConsultarStockProducto(String text) {
+
+        String[] partes = text.split("\\s+");
+
+        if (partes.length < 2) {
+
+            return """
+                ⚠️ Indicá el ID del producto.
+
+                Ejemplo:
+                /stockproducto 4
+                """;
+        }
+
+        return logisticaClient.consultarStockProducto(partes[1]);
+
+    }
+
+    private String procesarVaciarStock(String text) {
+
+        String[] partes = text.split("\\s+");
+
+        if (partes.length < 2) {
+
+            return """
+                ⚠️ Indicá el ID del depósito.
+
+                Ejemplo:
+                /vaciarstock 2
+                """;
+        }
+
+        return logisticaClient.vaciarStock(partes[1]);
+
+    }
+
+    private String procesarConfigurarAlgoritmo(String text) {
+
+        String[] campos = extraerArgumentos(text);
+
+        if (campos.length != 2) {
+
+            return """
+                ⚠️ Formato incorrecto.
+
+                Usá:
+                /configuraralgoritmo DepositoID|SUB_ATENDIDOS
+
+                o
+
+                /configuraralgoritmo DepositoID|PRIORIDAD_POR_SCORE
+                """;
+        }
+
+        return logisticaClient.configurarAlgoritmo(campos[0].trim(), campos[1].trim());
+
+    }
+
+    private String procesarConsultarAsignacion(String text) {
+
+        String[] partes = text.split("\\s+");
+
+        if (partes.length < 2) {
+
+            return """
+                ⚠️ Indicá el ID del paquete.
+
+                Ejemplo:
+                /asignacion 1
+                """;
+        }
+
+        return logisticaClient.consultarAsignacionPorPaquete(partes[1]);
+
+    }
+
 
     // ==================== Utilidades ====================
 
