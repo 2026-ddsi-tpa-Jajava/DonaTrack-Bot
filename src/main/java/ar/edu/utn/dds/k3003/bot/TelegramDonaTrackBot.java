@@ -45,9 +45,24 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
 
         String response = procesarComando(text);
 
+        log.info("RESPUESTA BOT = [{}]", response);
+
+        if (response == null || response.isBlank()) {
+
+            response = "⚠️ El comando no devolvió información.";
+
+        }
+
+        String respuesta = procesarComando(text);
+
+        log.info("RESPONSE LENGTH = {}", respuesta.length());
+
+        log.info("RESPONSE TEXT = [{}]", respuesta);
+
         SendMessage message = new SendMessage(chatId.toString(), response);
         message.enableMarkdown(true);
         try {
+            System.out.println("MENSAJE A ENVIAR = " + respuesta);
             execute(message);
         } catch (TelegramApiException exception) {
             log.error("[TELEGRAM_BOT] Error enviando mensaje a chatId={}", chatId, exception);
@@ -147,21 +162,21 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
             _Tipo de necesidad: EXTRAORDINARIA o RECURRENTE_
             
             Logística:
-            - /creardeposito Nombre|Direccion|Capacidad
-            - /depositos
-            - /deposito ID
-            - /stock ID
-            - /stockproducto ID
-            - /asignacion IDPAQUETE
-            - /asignaciones
-            - /asignadas
-            - /completadas
-            - /configuraralgoritmo DepositoID|SUB_ATENDIDOS
-            - /configuraralgoritmo DepositoID|PRIORIDAD_POR_SCORE
-            - /vaciarstock ID
-            - /eliminarpaquetes
-            - /eliminarasignaciones
-            - /eliminardepositos
+            - `/creardeposito Nombre|Direccion|Capacidad`
+            - `/depositos`
+            - `/deposito ID`
+            - `/stock ID`
+            - `/stockproducto ID`
+            - `/asignacion IDPAQUETE`
+            - `/asignaciones`
+            - `/asignadas`
+            - `/completadas`
+            - `/configuraralgoritmo DepositoID|SUB_ATENDIDOS`
+            - `/configuraralgoritmo DepositoID|PRIORIDAD_POR_SCORE`
+            - `/vaciarstock ID`
+            - `/eliminarpaquetes`
+            - `/eliminarasignaciones`
+            - `/eliminardepositos`
             """;
     }
 
