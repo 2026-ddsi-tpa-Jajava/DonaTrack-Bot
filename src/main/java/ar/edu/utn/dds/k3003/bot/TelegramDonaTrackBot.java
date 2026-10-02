@@ -24,11 +24,13 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
     private final DonadoresYEntidadesClient donadoresYEntidadesClient;
     private final LogisticaClient logisticaClient;
     private final DonacionesClient donacionesClient;
+    private final SessionManager sessionManager;
 
     public TelegramDonaTrackBot(IncentivosClient incentivosClient,
                                 DonadoresYEntidadesClient donadoresYEntidadesClient,
                                 LogisticaClient logisticaClient,
-                                DonacionesClient donacionesClient) {
+                                DonacionesClient donacionesClient,
+                                SessionManager sessionManager) {
 
         // Le pasamos el token directamente al constructor del padre
         super(requireEnv("TOKEN_BOT"));
@@ -38,6 +40,7 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
         this.donadoresYEntidadesClient = donadoresYEntidadesClient;
         this.logisticaClient = logisticaClient;
         this.donacionesClient = donacionesClient;
+        this.sessionManager = sessionManager;
     }
 
     @Override
@@ -47,28 +50,19 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
         }
         Long chatId = update.getMessage().getChatId();
         String text = update.getMessage().getText().trim();
+        String rol = text.startsWith("/admin") ? "admin" : "donador";
+        sessionManager.registrarInteraccion(chatId, text, rol);
         log.info("[TELEGRAM_BOT] Mensaje recibido chatId={} texto={}", chatId, text);
 
         String response = procesarComando(text);
-
-        log.info("RESPUESTA BOT = [{}]", response);
-
         if (response == null || response.isBlank()) {
-
             response = "⚠️ El comando no devolvió información.";
-
         }
-
-        String respuesta = procesarComando(text);
-
-        log.info("RESPONSE LENGTH = {}", respuesta.length());
-
-        log.info("RESPONSE TEXT = [{}]", respuesta);
+        log.info("RESPUESTA BOT = [{}]", response);
 
         SendMessage message = new SendMessage(chatId.toString(), response);
         message.enableMarkdown(true);
         try {
-            System.out.println("MENSAJE A ENVIAR = " + respuesta);
             execute(message);
         } catch (TelegramApiException exception) {
             log.error("[TELEGRAM_BOT] Error enviando mensaje a chatId={}", chatId, exception);

@@ -86,6 +86,9 @@ public class LogisticaClient {
         try {
 
             JsonNode deposito = restClient.get().uri("/depositos/{id}", id).retrieve().body(JsonNode.class);
+            if (deposito == null) {
+                return "❌ La API no devolvió los datos del depósito.";
+            }
 
             int cantidadStock = 0;
 
@@ -237,6 +240,9 @@ public class LogisticaClient {
         try {
 
             JsonNode asignacion = restClient.get().uri("/asignaciones/{id}", paqueteID).retrieve().body(JsonNode.class);
+            if (asignacion == null) {
+                return "❌ La API no devolvió los datos de la asignación.";
+            }
 
             return """
                 📦 Asignación
@@ -290,6 +296,9 @@ public class LogisticaClient {
             Map<String, Object> body = Map.of("nombre", nombre, "direccion", direccion, "capacidadMaxima", capacidadMaxima);
 
             JsonNode deposito = restClient.post().uri("/depositos").body(body).retrieve().body(JsonNode.class);
+            if (deposito == null) {
+                return "❌ El depósito se creó, pero la API no devolvió sus datos.";
+            }
 
             return """
                 ✅ Depósito creado

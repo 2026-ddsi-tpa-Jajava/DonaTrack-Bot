@@ -49,7 +49,7 @@ public class DonacionesClient {
             List<JsonNode> lista = restClient.get()
                     .uri("/donaciones")
                     .retrieve()
-                    .body(new ParameterizedTypeReference<>() {});
+                    .body(new ParameterizedTypeReference<List<JsonNode>>() {});
 
             if (lista == null || lista.isEmpty()) {
                 return "No hay donaciones registradas.";
@@ -120,6 +120,9 @@ public class DonacionesClient {
         try {
             Map<String, String> body = Map.of("nombre", nombre, "descripcion", descripcion);
             JsonNode creada = restClient.post().uri("/categorias").body(body).retrieve().body(JsonNode.class);
+            if (creada == null) {
+                return "❌ La categoría se creó, pero la API no devolvió sus datos.";
+            }
             return "✅ Categoría creada. ID: *" + creada.path("id").asText() + "*";
         } catch (Exception e) {
             return "❌ Error al crear la categoría.";
@@ -128,7 +131,8 @@ public class DonacionesClient {
 
     public String consultarCategorias() {
         try {
-            List<JsonNode> lista = restClient.get().uri("/categorias").retrieve().body(new ParameterizedTypeReference<>() {});
+            List<JsonNode> lista = restClient.get().uri("/categorias").retrieve()
+                    .body(new ParameterizedTypeReference<List<JsonNode>>() {});
             if (lista == null || lista.isEmpty()) return "No hay categorías registradas.";
             StringBuilder sb = new StringBuilder("📁 *Categorías:*\n");
             for (JsonNode c : lista) {
@@ -149,6 +153,9 @@ public class DonacionesClient {
             body.put("identificadorID", identificadorID);
 
             JsonNode creado = restClient.post().uri("/productos").body(body).retrieve().body(JsonNode.class);
+            if (creado == null) {
+                return "❌ El producto se creó, pero la API no devolvió sus datos.";
+            }
             return "✅ Producto creado. ID: *" + creado.path("id").asText() + "*";
         } catch (RestClientResponseException e) {
             return "❌ Error al crear producto (HTTP " + e.getStatusCode().value() + "). Verificá IDs de subcategoría e identificador.";
@@ -159,7 +166,7 @@ public class DonacionesClient {
 
     public String consultarProductos() {
         try {
-            List<JsonNode> lista = restClient.get().uri("/productos").retrieve().body(new ParameterizedTypeReference<>() {
+            List<JsonNode> lista = restClient.get().uri("/productos").retrieve().body(new ParameterizedTypeReference<List<JsonNode>>() {
             });
             if (lista == null || lista.isEmpty()) return "No hay productos registrados.";
             StringBuilder sb = new StringBuilder("🛒 *Productos:*\n");
@@ -178,6 +185,9 @@ public class DonacionesClient {
         try {
             Map<String, String> body = Map.of("tipo", tipo, "descripcion", descripcion);
             JsonNode creado = restClient.post().uri("/identificadores").body(body).retrieve().body(JsonNode.class);
+            if (creado == null) {
+                return "❌ El identificador se creó, pero la API no devolvió sus datos.";
+            }
             return "✅ Identificador creado. ID: *" + creado.path("id").asText() + "*";
         } catch (RestClientResponseException e) {
             return "❌ Error al crear identificador (HTTP " + e.getStatusCode().value() + "). Verificá que el tipo sea válido (ej: QR, CODIGODEBARRAS).";
@@ -188,7 +198,8 @@ public class DonacionesClient {
 
     public String consultarIdentificadores() {
         try {
-            List<JsonNode> lista = restClient.get().uri("/identificadores").retrieve().body(new ParameterizedTypeReference<>() {});
+            List<JsonNode> lista = restClient.get().uri("/identificadores").retrieve()
+                    .body(new ParameterizedTypeReference<List<JsonNode>>() {});
             if (lista == null || lista.isEmpty()) return "No hay identificadores registrados.";
             StringBuilder sb = new StringBuilder("🏷️ *Identificadores:*\n");
             for (JsonNode i : lista) {
@@ -210,6 +221,9 @@ public class DonacionesClient {
                     .body(body)
                     .retrieve()
                     .body(JsonNode.class);
+            if (creada == null) {
+                return "❌ La subcategoría se creó, pero la API no devolvió sus datos.";
+            }
             return "✅ Subcategoría creada. ID: *" + creada.path("id").asText() + "*";
         } catch (RestClientResponseException e) {
             return "❌ Error al crear subcategoría (HTTP " + e.getStatusCode().value() + "). Verificá que la categoría padre exista.";
@@ -223,7 +237,7 @@ public class DonacionesClient {
             List<JsonNode> lista = restClient.get()
                     .uri("/categorias/{id}/subcategorias", categoriaID)
                     .retrieve()
-                    .body(new ParameterizedTypeReference<>() {});
+                    .body(new ParameterizedTypeReference<List<JsonNode>>() {});
             if (lista == null || lista.isEmpty()) return "No hay subcategorías registradas para esa categoría.";
             StringBuilder sb = new StringBuilder("📁 *Subcategorías (Categoría Padre " + categoriaID + "):*\n");
             for (JsonNode s : lista) {
