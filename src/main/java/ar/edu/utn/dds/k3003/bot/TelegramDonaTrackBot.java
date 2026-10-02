@@ -13,6 +13,7 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
 import ar.edu.utn.dds.k3003.modulos.DonadoresYEntidadesClient;
 import ar.edu.utn.dds.k3003.modulos.IncentivosClient;
+import ar.edu.utn.dds.k3003.modulos.DonacionesClient;
 
 @Component
 public class TelegramDonaTrackBot extends TelegramLongPollingBot {
@@ -22,9 +23,13 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
     private final IncentivosClient incentivosClient;
     private final DonadoresYEntidadesClient donadoresYEntidadesClient;
     private final LogisticaClient logisticaClient;
+    private final DonacionesClient donacionesClient;
 
     public TelegramDonaTrackBot(IncentivosClient incentivosClient,
-                                 DonadoresYEntidadesClient donadoresYEntidadesClient, LogisticaClient logisticaClient) {
+                                DonadoresYEntidadesClient donadoresYEntidadesClient,
+                                LogisticaClient logisticaClient,
+                                DonacionesClient donacionesClient) {
+
         // Le pasamos el token directamente al constructor del padre
         super(requireEnv("TOKEN_BOT"));
 
@@ -32,6 +37,7 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
         this.incentivosClient = incentivosClient;
         this.donadoresYEntidadesClient = donadoresYEntidadesClient;
         this.logisticaClient = logisticaClient;
+        this.donacionesClient = donacionesClient;
     }
 
     @Override
@@ -99,6 +105,16 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
             case "/modificarnecesidad" -> procesarModificarNecesidad(text);
             case "/consultarnecesidad" -> procesarConsultarNecesidad(text);
 
+            // ---------- Catálogo Donaciones (Admin) ----------
+            case "/crearidentificador" -> procesarCrearIdentificador(text);
+            case "/identificadores" -> donacionesClient.consultarIdentificadores();
+            case "/crearcategoria" -> procesarCrearCategoria(text);
+            case "/categorias" -> donacionesClient.consultarCategorias();
+            case "/crearsubcategoria" -> procesarCrearSubcategoria(text);
+            case "/subcategorias" -> procesarConsultarSubcategorias(text);
+            case "/crearproducto" -> procesarCrearProducto(text);
+            case "/productos" -> donacionesClient.consultarProductos();
+
             // ---------- Logística ----------
             case "/creardeposito" -> procesarCrearDeposito(text);
             case "/depositos" -> logisticaClient.consultarDepositos();
@@ -114,6 +130,12 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
             case "/vaciarstock" -> procesarVaciarStock(text);
             case "/configuraralgoritmo" -> procesarConfigurarAlgoritmo(text);
             case "/asignacion" -> procesarConsultarAsignacion(text);
+
+            // ---------- Donaciones ----------
+            case "/donar" -> procesarDonar(text);
+            case "/donaciones" -> donacionesClient.consultarDonaciones();
+            case "/verdonacion" -> procesarVerDonacion(text);
+            case "/queja" -> procesarQueja(text);
 
             default -> "Comando no reconocido. Usá /start para ver opciones.";
         };
@@ -138,6 +160,8 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
             - /misestadisticas ID
             - /verdonador ID
             - /donadores  (lista todos)
+            - /donar DonadorID|DepositoID|Descripcion|ProductoID|Cantidad
+            - /queja DonacionID|Descripcion
 
             _Ejemplo:_ `/registrarme Juan|Perez|30|juan@mail.com|30111222|Av Siempre Viva 123`
             """;
@@ -177,6 +201,20 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
             - `/eliminarpaquetes`
             - `/eliminarasignaciones`
             - `/eliminardepositos`
+            
+            Donaciones:
+            - /donaciones  (lista todas)
+            - /verdonacion ID
+            
+            Catálogo Donaciones:
+            - /crearidentificador Tipo|Descripcion
+            - /identificadores
+            - /crearcategoria Nombre|Descripcion
+            - /categorias
+            - /crearsubcategoria Nombre|CategoriaID
+            - /subcategorias CategoriaID
+            - /crearproducto Nombre|Descripcion|SubcatID|IdentificadorID
+            - /productos
             """;
     }
 
@@ -482,6 +520,78 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
 
     }
 
+    // ==================== Donaciones (Nuevos Métodos) ====================
+    private String procesarDonar(String text) {
+        String[] campos = extraerArgumentos(text);
+        if (campos.length != 5) {
+            return "❌ Formato incorrecto.\nUso: `/donar DonadorID|DepositoID|Descripcion|ProductoID|Cantidad`";
+        }
+        try {
+            int cantidad = Integer.parseInt(campos[4].trim());
+            return donacionesClient.registrarDonacion(
+                    campos[0].trim(), campos[1].trim(), campos[2].trim(),
+                    campos[3].trim(), cantidad);
+        } catch (NumberFormatException e) {
+            return "❌ La cantidad tiene que ser un número válido.";
+        }
+    }
+
+    private String procesarVerDonacion(String text) {
+        String[] partes = text.split("\\s+");
+        if (partes.length < 2) {
+            return "⚠️ Indicá el ID de la donación.\nEjemplo: `/verdonacion 1`";
+        }
+        return donacionesClient.consultarDonacionPorId(partes[1].trim());
+    }
+
+    private String procesarQueja(String text) {
+        String[] campos = extraerArgumentos(text);
+        if (campos.length != 2) {
+            return "❌ Formato incorrecto.\nUso: `/queja DonacionID|Descripcion`\nEjemplo: `/queja 1|Producto en mal estado`";
+        }
+        return donacionesClient.registrarQueja(campos[0].trim(), campos[1].trim());
+    }
+
+    private String procesarCrearCategoria(String text) {
+        String[] campos = extraerArgumentos(text);
+        if (campos.length != 2) {
+            return "❌ Formato incorrecto.\nUso: `/crearcategoria Nombre|Descripcion`";
+        }
+        return donacionesClient.crearCategoria(campos[0].trim(), campos[1].trim());
+    }
+
+    private String procesarCrearProducto(String text) {
+        String[] campos = extraerArgumentos(text);
+        if (campos.length != 4) {
+            return "❌ Formato incorrecto.\nUso: `/crearproducto Nombre|Descripcion|SubcategoriaID|IdentificadorID`";
+        }
+        return donacionesClient.crearProducto(campos[0].trim(), campos[1].trim(), campos[2].trim(), campos[3].trim());
+    }
+
+    private String procesarCrearIdentificador(String text) {
+        String[] campos = extraerArgumentos(text);
+        if (campos.length != 2) {
+            return "❌ Formato incorrecto.\nUso: `/crearidentificador Tipo|Descripcion`\nEjemplo: `/crearidentificador QR|Codigo impreso`";
+        }
+        // Aplicamos toUpperCase al tipo (ej. qr -> QR) para alinear con el Enum de la base
+        return donacionesClient.crearIdentificador(campos[0].trim().toUpperCase(), campos[1].trim());
+    }
+
+    private String procesarCrearSubcategoria(String text) {
+        String[] campos = extraerArgumentos(text);
+        if (campos.length != 2) {
+            return "❌ Formato incorrecto.\nUso: `/crearsubcategoria Nombre|CategoriaID`";
+        }
+        return donacionesClient.crearSubcategoria(campos[0].trim(), campos[1].trim());
+    }
+
+    private String procesarConsultarSubcategorias(String text) {
+        String[] partes = text.split("\\s+");
+        if (partes.length < 2) {
+            return "⚠️ Indicá el ID de la categoría padre.\nEjemplo: `/subcategorias 1`";
+        }
+        return donacionesClient.consultarSubcategorias(partes[1].trim());
+    }
 
     // ==================== Utilidades ====================
 
