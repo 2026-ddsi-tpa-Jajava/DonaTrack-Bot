@@ -378,8 +378,9 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
 
     private String salirDelChat(Long chatId) {
         sessionManager.limpiarChat(chatId);
-        return "Sesión finalizada. No hay ninguna operación en curso.\n"
-                + "Cuando quieras volver a usar el bot, escribí `/start`.";
+        return """
+                Sesión finalizada. No hay ninguna operación en curso.
+                Cuando quieras volver a usar el bot, escribí `/start`.""";
     }
 
     private int cantidadCamposFormulario(String comando) {
