@@ -7,6 +7,7 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 
 import java.util.Map;
+import java.util.Objects;
 
 @Component
 public class LogisticaClient {
@@ -295,7 +296,7 @@ public class LogisticaClient {
 
             Map<String, Object> body = Map.of("nombre", nombre, "direccion", direccion, "capacidadMaxima", capacidadMaxima);
 
-            JsonNode deposito = restClient.post().uri("/depositos").body(body).retrieve().body(JsonNode.class);
+            JsonNode deposito = restClient.post().uri("/depositos").body(Objects.requireNonNull(body)).retrieve().body(JsonNode.class);
             if (deposito == null) {
                 return "❌ El depósito se creó, pero la API no devolvió sus datos.";
             }
@@ -328,7 +329,7 @@ public class LogisticaClient {
 
             Map<String, String> body = Map.of("algoritmo", algoritmo.toUpperCase());
 
-            restClient.patch().uri("/depositos/{id}/algoritmo", depositoID).body(body).retrieve().toBodilessEntity();
+            restClient.patch().uri("/depositos/{id}/algoritmo", depositoID).body(Objects.requireNonNull(body)).retrieve().toBodilessEntity();
 
             return "✅ Algoritmo configurado correctamente.";
 

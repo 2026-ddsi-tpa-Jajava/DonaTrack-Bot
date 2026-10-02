@@ -10,6 +10,7 @@ import org.springframework.web.client.RestClientResponseException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 @Component
 public class DonacionesClient {
@@ -31,7 +32,7 @@ public class DonacionesClient {
 
             JsonNode creada = restClient.post()
                     .uri("/donaciones")
-                    .body(body)
+                    .body(Objects.requireNonNull(body))
                     .retrieve()
                     .body(JsonNode.class);
 
@@ -78,13 +79,20 @@ public class DonacionesClient {
 
             if (d == null) return "Donación no encontrada.";
 
-            return "📦 *Detalle de Donación*\n"
-                    + "ID: " + d.path("id").asText("?") + "\n"
-                    + "Donador: " + d.path("donadorID").asText("-") + "\n"
-                    + "Depósito: " + d.path("depositoID").asText("-") + "\n"
-                    + "Producto: " + d.path("productoID").asText("-") + "\n"
-                    + "Cantidad: " + d.path("cantidad").asText("-") + "\n"
-                    + "Estado: *" + d.path("estado").asText("-") + "*";
+            return """
+                    📦 *Detalle de Donación*
+                    ID: %s
+                    Donador: %s
+                    Depósito: %s
+                    Producto: %s
+                    Cantidad: %s
+                    Estado: *%s*""".formatted(
+                    d.path("id").asText("?"),
+                    d.path("donadorID").asText("-"),
+                    d.path("depositoID").asText("-"),
+                    d.path("productoID").asText("-"),
+                    d.path("cantidad").asText("-"),
+                    d.path("estado").asText("-"));
         } catch (RestClientResponseException e) {
             if (e.getStatusCode().value() == 404) {
                 return "No encontramos ninguna donación con ese ID.";
@@ -100,7 +108,7 @@ public class DonacionesClient {
             Map<String, String> body = Map.of("descripcion", descripcion);
             JsonNode actualizada = restClient.post()
                     .uri("/donaciones/{id}/queja", id)
-                    .body(body)
+                    .body(Objects.requireNonNull(body))
                     .retrieve()
                     .body(JsonNode.class);
 
@@ -119,7 +127,7 @@ public class DonacionesClient {
     public String crearCategoria(String nombre, String descripcion) {
         try {
             Map<String, String> body = Map.of("nombre", nombre, "descripcion", descripcion);
-            JsonNode creada = restClient.post().uri("/categorias").body(body).retrieve().body(JsonNode.class);
+            JsonNode creada = restClient.post().uri("/categorias").body(Objects.requireNonNull(body)).retrieve().body(JsonNode.class);
             if (creada == null) {
                 return "❌ La categoría se creó, pero la API no devolvió sus datos.";
             }
@@ -152,7 +160,7 @@ public class DonacionesClient {
             body.put("subcategoriaID", subcategoriaID);
             body.put("identificadorID", identificadorID);
 
-            JsonNode creado = restClient.post().uri("/productos").body(body).retrieve().body(JsonNode.class);
+            JsonNode creado = restClient.post().uri("/productos").body(Objects.requireNonNull(body)).retrieve().body(JsonNode.class);
             if (creado == null) {
                 return "❌ El producto se creó, pero la API no devolvió sus datos.";
             }
@@ -184,7 +192,7 @@ public class DonacionesClient {
     public String crearIdentificador(String tipo, String descripcion) {
         try {
             Map<String, String> body = Map.of("tipo", tipo, "descripcion", descripcion);
-            JsonNode creado = restClient.post().uri("/identificadores").body(body).retrieve().body(JsonNode.class);
+            JsonNode creado = restClient.post().uri("/identificadores").body(Objects.requireNonNull(body)).retrieve().body(JsonNode.class);
             if (creado == null) {
                 return "❌ El identificador se creó, pero la API no devolvió sus datos.";
             }
@@ -218,7 +226,7 @@ public class DonacionesClient {
             Map<String, String> body = Map.of("nombre", nombre);
             JsonNode creada = restClient.post()
                     .uri("/categorias/{categoriaID}/subcategorias", categoriaID)
-                    .body(body)
+                    .body(Objects.requireNonNull(body))
                     .retrieve()
                     .body(JsonNode.class);
             if (creada == null) {

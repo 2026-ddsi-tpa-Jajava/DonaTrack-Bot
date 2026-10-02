@@ -390,9 +390,8 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
 
         try {
 
-            Integer capacidad = Integer.parseInt(campos[2].trim());
-
-            return logisticaClient.crearDeposito(campos[0].trim(), campos[1].trim(), capacidad);
+            return logisticaClient.crearDeposito(
+                    campos[0].trim(), campos[1].trim(), Integer.valueOf(campos[2].trim()));
 
         } catch (NumberFormatException e) {
 
