@@ -1,5 +1,6 @@
 package ar.edu.utn.dds.k3003.bot;
 
+import java.util.List;
 import java.util.Map;
 
 import ar.edu.utn.dds.k3003.modulos.LogisticaClient;
@@ -54,7 +55,7 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
         sessionManager.registrarInteraccion(chatId, text, rol);
         log.info("[TELEGRAM_BOT] Mensaje recibido chatId={} texto={}", chatId, text);
 
-        String response = procesarComando(text);
+        String response = procesarComando(chatId, text);
         if (response == null || response.isBlank()) {
             response = "⚠️ El comando no devolvió información.";
         }
@@ -69,8 +70,21 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
         }
     }
 
-    private String procesarComando(String text) {
+    private String procesarComando(Long chatId, String text) {
+        if ("/cancelar".equals(text.split("\\s+", 2)[0])) {
+            return cancelarFormulario(chatId);
+        }
+        if (!text.startsWith("/") && sessionManager.obtenerRegistroDonador(chatId) != null) {
+            return procesarRespuestaRegistroDonador(chatId, text);
+        }
+        if (!text.startsWith("/") && sessionManager.obtenerFormulario(chatId) != null) {
+            return procesarRespuestaFormulario(chatId, text);
+        }
+
         String comando = text.split("\\s+", 2)[0];
+        if (esFormularioConversacional(comando) && extraerArgumentos(text).length == 0) {
+            return iniciarFormulario(chatId, comando);
+        }
 
         return switch (comando) {
             case "/start" -> mensajeInicio();
@@ -81,7 +95,7 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
             case "/stats" -> procesarComandoStats(text);
 
             // ---------- Donadores ----------
-            case "/registrarme" -> procesarRegistrarme(text);
+            case "/registrarme" -> procesarRegistrarme(chatId, text);
             case "/misestadisticas" -> procesarMisEstadisticas(text);
             case "/verdonador" -> procesarVerDonador(text);
             case "/donadores" -> donadoresYEntidadesClient.consultarDonadores();
@@ -150,14 +164,15 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
         return """
             *Modo donador* 🙋
             Comandos disponibles:
-            - /registrarme Nombre|Apellido|Edad|Email|NroDocumento|Domicilio
+            - /registrarme  (registro guiado paso a paso)
             - /misestadisticas ID
             - /verdonador ID
             - /donadores  (lista todos)
-            - /donar DonadorID|DepositoID|Descripcion|ProductoID|Cantidad
-            - /queja DonacionID|Descripcion
+            - /donar  (registro guiado paso a paso)
+            - /queja  (registro guiado paso a paso)
 
-            _Ejemplo:_ `/registrarme Juan|Perez|30|juan@mail.com|30111222|Av Siempre Viva 123`
+            También podés usar el formato completo:
+            Escribí `/registrarme` y respondé las preguntas para completar el registro.
             """;
     }
 
@@ -165,22 +180,22 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
         return """
             *Modo admin* 🛠
             Entidades:
-            - /crearentidad RazonSocial|Domicilio|Telefono|Correo
-            - /editarentidad ID|RazonSocial|Domicilio|Telefono|Correo
+            - /crearentidad  (registro guiado paso a paso)
+            - /editarentidad ID campo=valor
             - /entidades  (lista todas)
             - /verentidad ID
 
             Necesidades:
-            - /crearnecesidad EntidadID|NivelUrgencia|Descripcion|CantidadObjetivo|ProductoID|Tipo
+            - /crearnecesidad  (registro guiado paso a paso)
             - /necesidades ProductoID
             - /consultarnecesidad ID
-            - /modificarnecesidad ID|Descripcion
+            - /modificarnecesidad ID campo=valor
             - /borrarnecesidad ID
 
             _Tipo de necesidad: EXTRAORDINARIA o RECURRENTE_
             
             Logística:
-            - `/creardeposito Nombre|Direccion|Capacidad`
+            - `/creardeposito` (registro guiado paso a paso)
             - `/depositos`
             - `/deposito ID`
             - `/stock ID`
@@ -189,8 +204,7 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
             - `/asignaciones`
             - `/asignadas`
             - `/completadas`
-            - `/configuraralgoritmo DepositoID|SUB_ATENDIDOS`
-            - `/configuraralgoritmo DepositoID|PRIORIDAD_POR_SCORE`
+            - `/configuraralgoritmo` (registro guiado paso a paso)
             - `/vaciarstock ID`
             - `/eliminarpaquetes`
             - `/eliminarasignaciones`
@@ -201,13 +215,13 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
             - /verdonacion ID
             
             Catálogo Donaciones:
-            - /crearidentificador Tipo|Descripcion
+            - /crearidentificador (registro guiado paso a paso)
             - /identificadores
-            - /crearcategoria Nombre|Descripcion
+            - /crearcategoria (registro guiado paso a paso)
             - /categorias
-            - /crearsubcategoria Nombre|CategoriaID
+            - /crearsubcategoria (registro guiado paso a paso)
             - /subcategorias CategoriaID
-            - /crearproducto Nombre|Descripcion|SubcatID|IdentificadorID
+            - /crearproducto (registro guiado paso a paso)
             - /productos
             """;
     }
@@ -227,19 +241,177 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
 
     // ==================== Donadores ====================
 
-    private String procesarRegistrarme(String text) {
+    private String procesarRegistrarme(Long chatId, String text) {
         String[] campos = extraerArgumentos(text);
+        if (campos.length == 0) {
+            sessionManager.iniciarRegistroDonador(chatId);
+            return "📝 Vamos a registrarte como donador.\n¿Cuál es tu nombre?";
+        }
         if (campos.length != 6) {
-            return "⚠️ Formato incorrecto.\nUsá: `/registrarme Nombre|Apellido|Edad|Email|NroDocumento|Domicilio`";
+            return "⚠️ Para registrarte, escribí `/registrarme` y respondé las preguntas una por una.";
         }
         try {
             int edad = Integer.parseInt(campos[2].trim());
+            sessionManager.cancelarRegistroDonador(chatId);
             return donadoresYEntidadesClient.registrarDonador(
                     campos[0].trim(), campos[1].trim(), edad,
                     campos[3].trim(), campos[4].trim(), campos[5].trim());
         } catch (NumberFormatException e) {
-            return "⚠️ La edad tiene que ser un número. Ejemplo: `/registrarme Juan|Perez|30|juan@mail.com|30111222|Av Siempre Viva 123`";
+            return "⚠️ La edad tiene que ser un número.";
         }
+    }
+
+    private String procesarRespuestaRegistroDonador(Long chatId, String respuesta) {
+        SessionManager.RegistroDonador registro = sessionManager.obtenerRegistroDonador(chatId);
+        if (registro == null) {
+            return "No hay un registro en curso. Escribí `/registrarme` para comenzar.";
+        }
+
+        if (registro.paso() == 2) {
+            try {
+                Integer.valueOf(respuesta);
+            } catch (NumberFormatException e) {
+                return "⚠️ La edad tiene que ser un número. ¿Cuál es tu edad?";
+            }
+        }
+
+        SessionManager.RegistroDonador actualizado =
+                sessionManager.guardarRespuestaRegistro(chatId, respuesta);
+        if (actualizado == null) {
+            return "No hay un registro en curso. Escribí `/registrarme` para comenzar.";
+        }
+
+        if (actualizado.paso() == 6) {
+            List<String> campos = actualizado.campos();
+            try {
+                String respuestaRegistro = donadoresYEntidadesClient.registrarDonador(
+                        campos.get(0), campos.get(1), Integer.valueOf(campos.get(2)),
+                        campos.get(3), campos.get(4), campos.get(5));
+                sessionManager.cancelarRegistroDonador(chatId);
+                return respuestaRegistro;
+            } catch (NumberFormatException e) {
+                return "⚠️ La edad tiene que ser un número.";
+            }
+        }
+
+        return switch (actualizado.paso()) {
+            case 1 -> "¿Cuál es tu apellido?";
+            case 2 -> "¿Cuál es tu edad?";
+            case 3 -> "¿Cuál es tu email?";
+            case 4 -> "¿Cuál es tu número de documento?";
+            case 5 -> "¿Cuál es tu domicilio?";
+            default -> "⚠️ No se pudo continuar el registro. Escribí `/registrarme` para empezar de nuevo.";
+        };
+    }
+
+    private boolean esFormularioConversacional(String comando) {
+        return switch (comando) {
+            case "/crearentidad", "/crearnecesidad", "/creardeposito",
+                    "/configuraralgoritmo", "/donar", "/queja",
+                    "/crearcategoria", "/crearproducto",
+                    "/crearidentificador", "/crearsubcategoria" -> true;
+            default -> false;
+        };
+    }
+
+    private String iniciarFormulario(Long chatId, String comando) {
+        sessionManager.iniciarFormulario(chatId, comando);
+        return preguntaFormulario(comando, 0);
+    }
+
+    private String procesarRespuestaFormulario(Long chatId, String respuesta) {
+        SessionManager.Formulario formulario = sessionManager.obtenerFormulario(chatId);
+        if (formulario == null) {
+            return "No hay un formulario en curso.";
+        }
+
+        if (requiereNumero(formulario.comando(), formulario.paso())) {
+            try {
+                Integer.valueOf(respuesta.trim());
+            } catch (NumberFormatException e) {
+                return "⚠️ Este campo tiene que ser un número.\n" +
+                        preguntaFormulario(formulario.comando(), formulario.paso());
+            }
+        }
+
+        SessionManager.Formulario actualizado =
+                sessionManager.guardarRespuestaFormulario(chatId, respuesta.trim());
+        int cantidadCampos = cantidadCamposFormulario(actualizado.comando());
+        if (actualizado.paso() < cantidadCampos) {
+            return preguntaFormulario(actualizado.comando(), actualizado.paso());
+        }
+
+        sessionManager.cancelarFormulario(chatId);
+        return procesarComando(chatId,
+                actualizado.comando() + " " + String.join("|", actualizado.campos()));
+    }
+
+    private String cancelarFormulario(Long chatId) {
+        sessionManager.cancelarRegistroDonador(chatId);
+        sessionManager.cancelarFormulario(chatId);
+        return "Operación cancelada. Podés iniciar otra cuando quieras.";
+    }
+
+    private int cantidadCamposFormulario(String comando) {
+        return switch (comando) {
+            case "/crearentidad" -> 4;
+            case "/crearnecesidad" -> 6;
+            case "/creardeposito", "/donar" -> comando.equals("/donar") ? 5 : 3;
+            case "/configuraralgoritmo", "/queja", "/crearcategoria",
+                    "/crearsubcategoria", "/crearidentificador" -> 2;
+            case "/crearproducto" -> 4;
+            default -> 0;
+        };
+    }
+
+    private boolean requiereNumero(String comando, int paso) {
+        return ("/crearnecesidad".equals(comando) && (paso == 1 || paso == 3))
+                || ("/creardeposito".equals(comando) && paso == 2)
+                || ("/donar".equals(comando) && paso == 4);
+    }
+
+    private String preguntaFormulario(String comando, int paso) {
+        return switch (comando) {
+            case "/crearentidad" -> switch (paso) {
+                case 0 -> "¿Cuál es la razón social de la entidad?";
+                case 1 -> "¿Cuál es el domicilio?";
+                case 2 -> "¿Cuál es el teléfono?";
+                default -> "¿Cuál es el correo electrónico?";
+            };
+            case "/crearnecesidad" -> switch (paso) {
+                case 0 -> "¿Cuál es el ID de la entidad?";
+                case 1 -> "¿Cuál es el nivel de urgencia? (número)";
+                case 2 -> "¿Cuál es la descripción?";
+                case 3 -> "¿Cuál es la cantidad objetivo? (número)";
+                case 4 -> "¿Cuál es el ID del producto?";
+                default -> "¿Qué tipo de necesidad es? (EXTRAORDINARIA o RECURRENTE)";
+            };
+            case "/creardeposito" -> switch (paso) {
+                case 0 -> "¿Cuál es el nombre del depósito?";
+                case 1 -> "¿Cuál es la dirección?";
+                default -> "¿Cuál es la capacidad? (número)";
+            };
+            case "/configuraralgoritmo" -> paso == 0
+                    ? "¿Cuál es el ID del depósito?" : "¿Qué algoritmo querés usar? (SUB_ATENDIDOS o PRIORIDAD_POR_SCORE)";
+            case "/donar" -> switch (paso) {
+                case 0 -> "¿Cuál es tu ID de donador?";
+                case 1 -> "¿Cuál es el ID del depósito?";
+                case 2 -> "¿Qué descripción tiene la donación?";
+                case 3 -> "¿Cuál es el ID del producto?";
+                default -> "¿Qué cantidad vas a donar? (número)";
+            };
+            case "/queja" -> paso == 0 ? "¿Cuál es el ID de la donación?" : "¿Cuál es la descripción de la queja?";
+            case "/crearcategoria" -> paso == 0 ? "¿Cuál es el nombre de la categoría?" : "¿Cuál es la descripción?";
+            case "/crearproducto" -> switch (paso) {
+                case 0 -> "¿Cuál es el nombre del producto?";
+                case 1 -> "¿Cuál es la descripción?";
+                case 2 -> "¿Cuál es el ID de la subcategoría?";
+                default -> "¿Cuál es el ID del identificador?";
+            };
+            case "/crearidentificador" -> paso == 0 ? "¿Qué tipo de identificador es? (QR o CODIGODEBARRAS)" : "¿Cuál es la descripción?";
+            case "/crearsubcategoria" -> paso == 0 ? "¿Cuál es el nombre de la subcategoría?" : "¿Cuál es el ID de la categoría?";
+            default -> "Ingresá el valor solicitado.";
+        };
     }
 
     private String procesarMisEstadisticas(String text) {
@@ -263,7 +435,7 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
     private String procesarCrearEntidad(String text) {
         String[] campos = extraerArgumentos(text);
         if (campos.length != 4) {
-            return "⚠️ Formato incorrecto.\nUsá: `/crearentidad RazonSocial|Domicilio|Telefono|Correo`";
+            return "⚠️ Para crear una entidad, escribí `/crearentidad` y respondé las preguntas.";
         }
         return donadoresYEntidadesClient.crearEntidad(
                 campos[0].trim(), campos[1].trim(), campos[2].trim(), campos[3].trim());
@@ -308,7 +480,7 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
     private String procesarCrearNecesidad(String text) {
         String[] campos = extraerArgumentos(text);
         if (campos.length != 6) {
-            return "⚠️ Formato incorrecto.\nUsá: `/crearnecesidad EntidadID|NivelUrgencia|Descripcion|CantidadObjetivo|ProductoID|Tipo`";
+            return "⚠️ Para crear una necesidad, escribí `/crearnecesidad` y respondé las preguntas.";
         }
         try {
             int nivelUrgencia = Integer.parseInt(campos[1].trim());
@@ -380,11 +552,7 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
             return """
                 ⚠️ Formato incorrecto.
 
-                Usá:
-                /creardeposito Nombre|Direccion|Capacidad
-
-                Ejemplo:
-                /creardeposito Deposito Central|Medrano 951|1000
+                Escribí /creardeposito y respondé las preguntas.
                 """;
         }
 
@@ -482,12 +650,7 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
             return """
                 ⚠️ Formato incorrecto.
 
-                Usá:
-                /configuraralgoritmo DepositoID|SUB_ATENDIDOS
-
-                o
-
-                /configuraralgoritmo DepositoID|PRIORIDAD_POR_SCORE
+                Escribí /configuraralgoritmo y respondé las preguntas.
                 """;
         }
 
@@ -517,7 +680,7 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
     private String procesarDonar(String text) {
         String[] campos = extraerArgumentos(text);
         if (campos.length != 5) {
-            return "❌ Formato incorrecto.\nUso: `/donar DonadorID|DepositoID|Descripcion|ProductoID|Cantidad`";
+            return "❌ Para registrar una donación, escribí `/donar` y respondé las preguntas.";
         }
         try {
             int cantidad = Integer.parseInt(campos[4].trim());
@@ -540,7 +703,7 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
     private String procesarQueja(String text) {
         String[] campos = extraerArgumentos(text);
         if (campos.length != 2) {
-            return "❌ Formato incorrecto.\nUso: `/queja DonacionID|Descripcion`\nEjemplo: `/queja 1|Producto en mal estado`";
+            return "❌ Para registrar una queja, escribí `/queja` y respondé las preguntas.";
         }
         return donacionesClient.registrarQueja(campos[0].trim(), campos[1].trim());
     }
@@ -548,7 +711,7 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
     private String procesarCrearCategoria(String text) {
         String[] campos = extraerArgumentos(text);
         if (campos.length != 2) {
-            return "❌ Formato incorrecto.\nUso: `/crearcategoria Nombre|Descripcion`";
+            return "❌ Para crear una categoría, escribí `/crearcategoria` y respondé las preguntas.";
         }
         return donacionesClient.crearCategoria(campos[0].trim(), campos[1].trim());
     }
@@ -556,7 +719,7 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
     private String procesarCrearProducto(String text) {
         String[] campos = extraerArgumentos(text);
         if (campos.length != 4) {
-            return "❌ Formato incorrecto.\nUso: `/crearproducto Nombre|Descripcion|SubcategoriaID|IdentificadorID`";
+            return "❌ Para crear un producto, escribí `/crearproducto` y respondé las preguntas.";
         }
         return donacionesClient.crearProducto(campos[0].trim(), campos[1].trim(), campos[2].trim(), campos[3].trim());
     }
@@ -564,7 +727,7 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
     private String procesarCrearIdentificador(String text) {
         String[] campos = extraerArgumentos(text);
         if (campos.length != 2) {
-            return "❌ Formato incorrecto.\nUso: `/crearidentificador Tipo|Descripcion`\nEjemplo: `/crearidentificador QR|Codigo impreso`";
+            return "❌ Para crear un identificador, escribí `/crearidentificador` y respondé las preguntas.";
         }
         // Aplicamos toUpperCase al tipo (ej. qr -> QR) para alinear con el Enum de la base
         return donacionesClient.crearIdentificador(campos[0].trim().toUpperCase(), campos[1].trim());
@@ -573,7 +736,7 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
     private String procesarCrearSubcategoria(String text) {
         String[] campos = extraerArgumentos(text);
         if (campos.length != 2) {
-            return "❌ Formato incorrecto.\nUso: `/crearsubcategoria Nombre|CategoriaID`";
+            return "❌ Para crear una subcategoría, escribí `/crearsubcategoria` y respondé las preguntas.";
         }
         return donacionesClient.crearSubcategoria(campos[0].trim(), campos[1].trim());
     }
