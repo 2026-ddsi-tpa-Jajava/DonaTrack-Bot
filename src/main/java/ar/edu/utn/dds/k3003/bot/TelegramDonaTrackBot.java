@@ -71,7 +71,8 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
     }
 
     private String procesarComando(Long chatId, String text) {
-        if ("/cancelar".equals(text.split("\\s+", 2)[0])) {
+        String comando = extraerComando(text);
+        if ("/cancelar".equals(comando)) {
             return cancelarFormulario(chatId);
         }
         if (!text.startsWith("/") && sessionManager.obtenerRegistroDonador(chatId) != null) {
@@ -81,7 +82,6 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
             return procesarRespuestaFormulario(chatId, text);
         }
 
-        String comando = text.split("\\s+", 2)[0];
         if (esFormularioConversacional(comando) && extraerArgumentos(text).length == 0) {
             return iniciarFormulario(chatId, comando);
         }
@@ -762,6 +762,12 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
             return new String[0];
         }
         return partes[1].split("\\|");
+    }
+
+    private String extraerComando(String text) {
+        String comando = text.split("\\s+", 2)[0];
+        int separadorUsuario = comando.indexOf('@');
+        return separadorUsuario >= 0 ? comando.substring(0, separadorUsuario) : comando;
     }
 
     @Override
