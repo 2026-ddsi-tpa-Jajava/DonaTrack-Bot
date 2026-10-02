@@ -1,7 +1,9 @@
 package ar.edu.utn.dds.k3003.bot;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import ar.edu.utn.dds.k3003.modulos.LogisticaClient;
 import org.slf4j.Logger;
@@ -19,6 +21,7 @@ import ar.edu.utn.dds.k3003.modulos.DonacionesClient;
 @Component
 public class TelegramDonaTrackBot extends TelegramLongPollingBot {
 
+    private static final Duration TIEMPO_MAXIMO_INACTIVIDAD = Duration.ofMinutes(10);
     private static final Logger log = LoggerFactory.getLogger(TelegramDonaTrackBot.class);
     private final String botUsername;
     private final IncentivosClient incentivosClient;
@@ -26,6 +29,7 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
     private final LogisticaClient logisticaClient;
     private final DonacionesClient donacionesClient;
     private final SessionManager sessionManager;
+    private final ConcurrentHashMap<Integer, Boolean> actualizacionesProcesadas = new ConcurrentHashMap<>();
 
     public TelegramDonaTrackBot(IncentivosClient incentivosClient,
                                 DonadoresYEntidadesClient donadoresYEntidadesClient,
@@ -46,16 +50,26 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
 
     @Override
     public void onUpdateReceived(Update update) {
+        if (actualizacionesProcesadas.putIfAbsent(update.getUpdateId(), Boolean.TRUE) != null) {
+            log.debug("[TELEGRAM_BOT] Actualización duplicada ignorada updateId={}", update.getUpdateId());
+            return;
+        }
+        if (actualizacionesProcesadas.size() > 10_000) {
+            actualizacionesProcesadas.clear();
+        }
         if (!update.hasMessage() || !update.getMessage().hasText()) {
             return;
         }
         Long chatId = update.getMessage().getChatId();
         String text = update.getMessage().getText().trim();
+        boolean formularioExpirado = sessionManager.limpiarSiInactiva(chatId, TIEMPO_MAXIMO_INACTIVIDAD);
         String rol = text.startsWith("/admin") ? "admin" : "donador";
         sessionManager.registrarInteraccion(chatId, text, rol);
         log.info("[TELEGRAM_BOT] Mensaje recibido chatId={} texto={}", chatId, text);
 
-        String response = procesarComando(chatId, text);
+        String response = formularioExpirado && !text.startsWith("/")
+                ? "⌛ La operación venció por inactividad. Escribí `/start` para comenzar de nuevo."
+                : procesarComando(chatId, text);
         if (response == null || response.isBlank()) {
             response = "⚠️ El comando no devolvió información.";
         }
@@ -72,6 +86,13 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
 
     private String procesarComando(Long chatId, String text) {
         String comando = extraerComando(text);
+        if ("/start".equals(comando) || "/menu".equals(comando)) {
+            sessionManager.limpiarChat(chatId);
+            return mensajeInicio();
+        }
+        if ("/salir".equals(comando) || "/apagar".equals(comando)) {
+            return salirDelChat(chatId);
+        }
         if ("/cancelar".equals(comando)) {
             return cancelarFormulario(chatId);
         }
@@ -87,7 +108,6 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
         }
 
         return switch (comando) {
-            case "/start" -> mensajeInicio();
             case "/donador" -> menuDonador();
             case "/admin" -> menuAdmin();
 
@@ -153,76 +173,80 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
 
     private String mensajeInicio() {
         return """
-            ¡Hola! Soy el bot de DonaTrack.
-            ¿Qué tipo de usuario sos?
-            - /donador
-            - /admin
+            👋 *¡Hola! Soy DonaTrack!*
+
+            Elegí una opción:
+            🙋 /donador — Menú de donaciones
+            🛠️ /admin — Herramientas de administración
+
+            📌 *Comandos útiles*
+            🏠 /start o /menu — Volver al inicio
+            👋 /salir — Finalizar la sesión
             """;
     }
 
     private String menuDonador() {
         return """
-            *Modo donador* 🙋
-            Comandos disponibles:
-            - /registrarme  (registro guiado paso a paso)
-            - /misestadisticas ID
-            - /verdonador ID
-            - /donadores  (lista todos)
-            - /donar  (registro guiado paso a paso)
-            - /queja  (registro guiado paso a paso)
+            🙋 *Menú de donador*
 
-            También podés usar el formato completo:
-            Escribí `/registrarme` y respondé las preguntas para completar el registro.
+            📝 /registrarme — Crear mi cuenta
+            📊 /misestadisticas ID — Ver mis estadísticas
+            👤 /verdonador ID — Consultar un donador
+            👥 /donadores — Ver todos los donadores
+            🎁 /donar — Registrar una donación
+            📣 /queja — Registrar una queja
+
+            Elegí un comando para comenzar.
             """;
     }
 
     private String menuAdmin() {
         return """
-            *Modo admin* 🛠
-            Entidades:
-            - /crearentidad  (registro guiado paso a paso)
-            - /editarentidad ID campo=valor
-            - /entidades  (lista todas)
-            - /verentidad ID
+            🛠️ *Menú de administración*
 
-            Necesidades:
-            - /crearnecesidad  (registro guiado paso a paso)
-            - /necesidades ProductoID
-            - /consultarnecesidad ID
-            - /modificarnecesidad ID campo=valor
-            - /borrarnecesidad ID
+            🏢 *Entidades*
+            ➕ /crearentidad — Crear una entidad
+            ✏️ /editarentidad ID campo=valor
+            📋 /entidades — Listar entidades
+            🔎 /verentidad ID
 
-            _Tipo de necesidad: EXTRAORDINARIA o RECURRENTE_
-            
-            Logística:
-            - `/creardeposito` (registro guiado paso a paso)
-            - `/depositos`
-            - `/deposito ID`
-            - `/stock ID`
-            - `/stockproducto ID`
-            - `/asignacion IDPAQUETE`
-            - `/asignaciones`
-            - `/asignadas`
-            - `/completadas`
-            - `/configuraralgoritmo` (registro guiado paso a paso)
-            - `/vaciarstock ID`
-            - `/eliminarpaquetes`
-            - `/eliminarasignaciones`
-            - `/eliminardepositos`
-            
-            Donaciones:
-            - /donaciones  (lista todas)
-            - /verdonacion ID
-            
-            Catálogo Donaciones:
-            - /crearidentificador (registro guiado paso a paso)
-            - /identificadores
-            - /crearcategoria (registro guiado paso a paso)
-            - /categorias
-            - /crearsubcategoria (registro guiado paso a paso)
-            - /subcategorias CategoriaID
-            - /crearproducto (registro guiado paso a paso)
-            - /productos
+            🆘 *Necesidades*
+            ➕ /crearnecesidad — Crear una necesidad
+            📋 /necesidades ProductoID
+            🔎 /consultarnecesidad ID
+            ✏️ /modificarnecesidad ID campo=valor
+            🗑️ /borrarnecesidad ID
+            ℹ️ Tipos: EXTRAORDINARIA o RECURRENTE
+
+            🚚 *Logística*
+            ➕ /creardeposito — Crear un depósito
+            🏢 /depositos — Listar depósitos
+            🔎 /deposito ID
+            📦 /stock ID
+            📦 /stockproducto ID
+            🔗 /asignacion IDPAQUETE
+            📋 /asignaciones
+            ✅ /asignadas
+            ✔️ /completadas
+            ⚙️ /configuraralgoritmo
+            🧹 /vaciarstock ID
+            🗑️ /eliminarpaquetes
+            🗑️ /eliminarasignaciones
+            🗑️ /eliminardepositos
+
+            🎁 *Donaciones*
+            📋 /donaciones — Listar donaciones
+            🔎 /verdonacion ID
+
+            🗂️ *Catálogo*
+            🏷️ /crearidentificador
+            📋 /identificadores
+            ➕ /crearcategoria
+            📋 /categorias
+            ➕ /crearsubcategoria
+            📋 /subcategorias CategoriaID
+            ➕ /crearproducto
+            📋 /productos
             """;
     }
 
@@ -350,6 +374,12 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
         sessionManager.cancelarRegistroDonador(chatId);
         sessionManager.cancelarFormulario(chatId);
         return "Operación cancelada. Podés iniciar otra cuando quieras.";
+    }
+
+    private String salirDelChat(Long chatId) {
+        sessionManager.limpiarChat(chatId);
+        return "Sesión finalizada. No hay ninguna operación en curso.\n"
+                + "Cuando quieras volver a usar el bot, escribí `/start`.";
     }
 
     private int cantidadCamposFormulario(String comando) {

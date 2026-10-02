@@ -1,6 +1,7 @@
 package ar.edu.utn.dds.k3003.bot;
 
 import java.time.Instant;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
@@ -84,5 +85,21 @@ public class SessionManager {
 
     public void cancelarFormulario(Long chatId) {
         formularios.remove(chatId);
+    }
+
+    public void limpiarChat(Long chatId) {
+        registrosDonadores.remove(chatId);
+        formularios.remove(chatId);
+    }
+
+    public boolean limpiarSiInactiva(Long chatId, Duration tiempoMaximo) {
+        boolean tieneFormulario = registrosDonadores.containsKey(chatId) || formularios.containsKey(chatId);
+        Sesion sesion = sesiones.get(chatId);
+        if (tieneFormulario && (sesion == null
+                || Duration.between(sesion.ultimaActividad(), Instant.now()).compareTo(tiempoMaximo) > 0)) {
+            limpiarChat(chatId);
+            return true;
+        }
+        return false;
     }
 }
