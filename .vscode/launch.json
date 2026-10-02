@@ -7,9 +7,8 @@
       "request": "launch",
       "mainClass": "ar.edu.utn.dds.k3003.DonaTrackBotApplication",
       "projectName": "donatrack-bot",
+      "envFile": "${workspaceFolder}/.env",
       "env": {
-        "TOKEN_BOT": "${env:TOKEN_BOT}",
-        "NOMBRE_BOT": "${env:NOMBRE_BOT}",
         "TELEGRAM_BOT_ENABLED": "true"
       }
     }
