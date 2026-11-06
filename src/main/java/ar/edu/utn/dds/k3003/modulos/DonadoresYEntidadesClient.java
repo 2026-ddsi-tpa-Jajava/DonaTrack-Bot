@@ -14,7 +14,7 @@ import org.springframework.web.client.RestClientResponseException;
 import com.fasterxml.jackson.databind.JsonNode;
 
 /**
- * Cliente HTTP hacia el módulo "Donadores y Entidades".
+ * Cliente HTTP hacia los endpoints de Donadores y Entidades expuestos por el API Gateway.
  *
  * Endpoints disponibles:
  *   GET    /donadores/{id}/estadisticas
@@ -38,10 +38,10 @@ public class DonadoresYEntidadesClient {
     private final IncentivosClient incentivosClient;
 
     public DonadoresYEntidadesClient(
-        @Value("${donadoresyentidades.url:https://agusb1101-donadores-entidades.onrender.com}") String baseUrl,
+        @Value("${api.gateway.url}") String baseUrl,
         IncentivosClient incentivosClient) {
         
-    String urlSegura = (baseUrl != null) ? baseUrl : "https://agusb1101-donadores-entidades.onrender.com";
+    String urlSegura = (baseUrl != null && !baseUrl.isBlank()) ? baseUrl : "http://localhost:8080";
     
     // Acá aplicamos el requireNonNull para que el IDE deje de molestar
     this.restClient = RestClient.create(java.util.Objects.requireNonNull(urlSegura));
@@ -62,7 +62,7 @@ public class DonadoresYEntidadesClient {
             body.put("domicilio", domicilio);
 
             JsonNode creado = restClient.post()
-                    .uri("/donadores")
+                    .uri("/donadores-entidades/donadores")
                     .body(body)
                     .retrieve()
                     .body(JsonNode.class);
@@ -81,7 +81,7 @@ public class DonadoresYEntidadesClient {
     public String consultarEstadisticas(String donadorID) {
         try {
             JsonNode root = restClient.get()
-                    .uri("/donadores/{id}/estadisticas", donadorID)
+                    .uri("/donadores-entidades/donadores/{id}/estadisticas", donadorID)
                     .retrieve()
                     .body(JsonNode.class);
             return formatearEstadisticas(root);
@@ -98,7 +98,7 @@ public class DonadoresYEntidadesClient {
     public String consultarDonadorPorId(String id) {
         try {
             JsonNode donador = restClient.get()
-                    .uri("/donadores/{id}", id)
+                    .uri("/donadores-entidades/donadores/{id}", id)
                     .retrieve()
                     .body(JsonNode.class);
             return formatearDonador(donador);
@@ -115,7 +115,7 @@ public class DonadoresYEntidadesClient {
     public String consultarDonadores() {
         try {
             List<JsonNode> lista = restClient.get()
-                    .uri("/donadores")
+                    .uri("/donadores-entidades/donadores")
                     .retrieve()
                     .body(new ParameterizedTypeReference<List<JsonNode>>() {});
 
@@ -146,7 +146,7 @@ public class DonadoresYEntidadesClient {
             body.put("correo", correo);
 
             JsonNode creada = restClient.post()
-                    .uri("/entidades")
+                    .uri("/donadores-entidades/entidades")
                     .body(body)
                     .retrieve()
                     .body(JsonNode.class);
@@ -165,7 +165,7 @@ public class DonadoresYEntidadesClient {
             // Mandamos directamente el mapa. 
             // Jackson (por debajo) lo convierte al JSON exacto con los campos recibidos.
             JsonNode editada = restClient.patch()
-                    .uri("/entidades/{id}", id)
+                    .uri("/donadores-entidades/entidades/{id}", id)
                     .body(java.util.Objects.requireNonNull(camposAModificar))
                     .retrieve()
                     .body(JsonNode.class);
@@ -184,7 +184,7 @@ public class DonadoresYEntidadesClient {
     public String consultarEntidades() {
         try {
             List<JsonNode> lista = restClient.get()
-                    .uri("/entidades")
+                    .uri("/donadores-entidades/entidades")
                     .retrieve()
                     .body(new ParameterizedTypeReference<List<JsonNode>>() {});
 
@@ -206,7 +206,7 @@ public class DonadoresYEntidadesClient {
     public String consultarEntidadPorId(String id) {
         try {
             JsonNode entidad = restClient.get()
-                    .uri("/entidades/{id}", id)
+                    .uri("/donadores-entidades/entidades/{id}", id)
                     .retrieve()
                     .body(JsonNode.class);
             return formatearEntidad(entidad);
@@ -234,7 +234,7 @@ public class DonadoresYEntidadesClient {
             body.put("tipo", tipo); // EXTRAORDINARIA o RECURRENTE
 
             JsonNode creada = restClient.post()
-                    .uri("/necesidades")
+                    .uri("/donadores-entidades/necesidades")
                     .body(body)
                     .retrieve()
                     .body(JsonNode.class);
@@ -252,7 +252,7 @@ public class DonadoresYEntidadesClient {
     public String consultarNecesidadesPorProducto(String productoID) {
         try {
             List<JsonNode> lista = restClient.get()
-                    .uri(uriBuilder -> uriBuilder.path("/necesidades")
+                    .uri(uriBuilder -> uriBuilder.path("/donadores-entidades/necesidades")
                             .queryParam("productoID", productoID)
                             .build())
                     .retrieve()
@@ -277,7 +277,7 @@ public class DonadoresYEntidadesClient {
     public String borrarNecesidad(String id) {
         try {
             restClient.delete()
-                    .uri("/necesidades/{id}", id)
+                    .uri("/donadores-entidades/necesidades/{id}", id)
                     .retrieve()
                     .toBodilessEntity();
             return "🗑️ Necesidad *" + id + "* borrada correctamente.";
@@ -294,7 +294,7 @@ public class DonadoresYEntidadesClient {
     public String modificarNecesidad(String id, Map<String, Object> camposAModificar) {
         try {
             JsonNode editada = restClient.patch()
-                    .uri("/necesidades/{id}", id)
+                    .uri("/donadores-entidades/necesidades/{id}", id)
                     .body(java.util.Objects.requireNonNull(camposAModificar))
                     .retrieve()
                     .body(JsonNode.class);
@@ -314,7 +314,7 @@ public class DonadoresYEntidadesClient {
     public String consultarNecesidadPorId(String id) {
         try {
             JsonNode n = restClient.get()
-                    .uri("/necesidades/{id}", id)
+                    .uri("/donadores-entidades/necesidades/{id}", id)
                     .retrieve()
                     .body(JsonNode.class);
             return formatearNecesidad(n);

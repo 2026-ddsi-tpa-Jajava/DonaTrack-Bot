@@ -16,8 +16,8 @@ import java.util.Objects;
 public class DonacionesClient {
     private final RestClient restClient;
 
-    public DonacionesClient(@Value("${donaciones.url:https://donaciones-5u8i.onrender.com}") String baseUrl) {
-        String urlSegura = (baseUrl != null && !baseUrl.isBlank()) ? baseUrl : "https://donaciones-5u8i.onrender.com";
+    public DonacionesClient(@Value("${api.gateway.url}") String baseUrl) {
+        String urlSegura = (baseUrl != null && !baseUrl.isBlank()) ? baseUrl : "http://localhost:8080";
         this.restClient = RestClient.create(urlSegura);
     }
 
@@ -31,7 +31,7 @@ public class DonacionesClient {
             body.put("cantidad", cantidad);
 
             JsonNode creada = restClient.post()
-                    .uri("/donaciones")
+                    .uri("/donaciones/donaciones")
                     .body(Objects.requireNonNull(body))
                     .retrieve()
                     .body(JsonNode.class);
@@ -48,7 +48,7 @@ public class DonacionesClient {
     public String consultarDonaciones() {
         try {
             List<JsonNode> lista = restClient.get()
-                    .uri("/donaciones")
+                    .uri("/donaciones/donaciones")
                     .retrieve()
                     .body(new ParameterizedTypeReference<List<JsonNode>>() {});
 
@@ -73,7 +73,7 @@ public class DonacionesClient {
     public String consultarDonacionPorId(String id) {
         try {
             JsonNode d = restClient.get()
-                    .uri("/donaciones/{id}", id)
+                    .uri("/donaciones/donaciones/{id}", id)
                     .retrieve()
                     .body(JsonNode.class);
 
@@ -107,7 +107,7 @@ public class DonacionesClient {
         try {
             Map<String, String> body = Map.of("descripcion", descripcion);
             JsonNode actualizada = restClient.post()
-                    .uri("/donaciones/{id}/queja", id)
+                    .uri("/donaciones/donaciones/{id}/queja", id)
                     .body(Objects.requireNonNull(body))
                     .retrieve()
                     .body(JsonNode.class);
@@ -127,7 +127,7 @@ public class DonacionesClient {
     public String crearCategoria(String nombre, String descripcion) {
         try {
             Map<String, String> body = Map.of("nombre", nombre, "descripcion", descripcion);
-            JsonNode creada = restClient.post().uri("/categorias").body(Objects.requireNonNull(body)).retrieve().body(JsonNode.class);
+            JsonNode creada = restClient.post().uri("/donaciones/categorias").body(Objects.requireNonNull(body)).retrieve().body(JsonNode.class);
             if (creada == null) {
                 return "❌ La categoría se creó, pero la API no devolvió sus datos.";
             }
@@ -139,7 +139,7 @@ public class DonacionesClient {
 
     public String consultarCategorias() {
         try {
-            List<JsonNode> lista = restClient.get().uri("/categorias").retrieve()
+            List<JsonNode> lista = restClient.get().uri("/donaciones/categorias").retrieve()
                     .body(new ParameterizedTypeReference<List<JsonNode>>() {});
             if (lista == null || lista.isEmpty()) return "No hay categorías registradas.";
             StringBuilder sb = new StringBuilder("📁 *Categorías:*\n");
@@ -160,7 +160,7 @@ public class DonacionesClient {
             body.put("subcategoriaID", subcategoriaID);
             body.put("identificadorID", identificadorID);
 
-            JsonNode creado = restClient.post().uri("/productos").body(Objects.requireNonNull(body)).retrieve().body(JsonNode.class);
+            JsonNode creado = restClient.post().uri("/donaciones/productos").body(Objects.requireNonNull(body)).retrieve().body(JsonNode.class);
             if (creado == null) {
                 return "❌ El producto se creó, pero la API no devolvió sus datos.";
             }
@@ -174,7 +174,7 @@ public class DonacionesClient {
 
     public String consultarProductos() {
         try {
-            List<JsonNode> lista = restClient.get().uri("/productos").retrieve().body(new ParameterizedTypeReference<List<JsonNode>>() {
+            List<JsonNode> lista = restClient.get().uri("/donaciones/productos").retrieve().body(new ParameterizedTypeReference<List<JsonNode>>() {
             });
             if (lista == null || lista.isEmpty()) return "No hay productos registrados.";
             StringBuilder sb = new StringBuilder("🛒 *Productos:*\n");
@@ -192,7 +192,7 @@ public class DonacionesClient {
     public String crearIdentificador(String tipo, String descripcion) {
         try {
             Map<String, String> body = Map.of("tipo", tipo, "descripcion", descripcion);
-            JsonNode creado = restClient.post().uri("/identificadores").body(Objects.requireNonNull(body)).retrieve().body(JsonNode.class);
+            JsonNode creado = restClient.post().uri("/donaciones/identificadores").body(Objects.requireNonNull(body)).retrieve().body(JsonNode.class);
             if (creado == null) {
                 return "❌ El identificador se creó, pero la API no devolvió sus datos.";
             }
@@ -206,7 +206,7 @@ public class DonacionesClient {
 
     public String consultarIdentificadores() {
         try {
-            List<JsonNode> lista = restClient.get().uri("/identificadores").retrieve()
+            List<JsonNode> lista = restClient.get().uri("/donaciones/identificadores").retrieve()
                     .body(new ParameterizedTypeReference<List<JsonNode>>() {});
             if (lista == null || lista.isEmpty()) return "No hay identificadores registrados.";
             StringBuilder sb = new StringBuilder("🏷️ *Identificadores:*\n");
@@ -225,7 +225,7 @@ public class DonacionesClient {
         try {
             Map<String, String> body = Map.of("nombre", nombre);
             JsonNode creada = restClient.post()
-                    .uri("/categorias/{categoriaID}/subcategorias", categoriaID)
+                    .uri("/donaciones/categorias/{categoriaID}/subcategorias", categoriaID)
                     .body(Objects.requireNonNull(body))
                     .retrieve()
                     .body(JsonNode.class);
@@ -243,7 +243,7 @@ public class DonacionesClient {
     public String consultarSubcategorias(String categoriaID) {
         try {
             List<JsonNode> lista = restClient.get()
-                    .uri("/categorias/{id}/subcategorias", categoriaID)
+                    .uri("/donaciones/categorias/{id}/subcategorias", categoriaID)
                     .retrieve()
                     .body(new ParameterizedTypeReference<List<JsonNode>>() {});
             if (lista == null || lista.isEmpty()) return "No hay subcategorías registradas para esa categoría.";

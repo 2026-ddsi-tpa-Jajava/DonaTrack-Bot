@@ -14,9 +14,8 @@ public class LogisticaClient {
 
     private final RestClient restClient;
 
-    public LogisticaClient(@Value("${logistica.url:https://logistica-hjaw.onrender.com}") String baseUrl) {
-
-        String urlSegura = (baseUrl != null) ? baseUrl : "https://logistica-hjaw.onrender.com";
+    public LogisticaClient(@Value("${api.gateway.url}") String baseUrl) {
+        String urlSegura = (baseUrl != null && !baseUrl.isBlank()) ? baseUrl : "http://localhost:8080";
 
         this.restClient = RestClient.create(urlSegura);
     }
@@ -27,7 +26,7 @@ public class LogisticaClient {
 
         try {
 
-            JsonNode lista = restClient.get().uri("/depositos").retrieve().body(JsonNode.class);
+            JsonNode lista = restClient.get().uri("/logistica/depositos").retrieve().body(JsonNode.class);
 
             if (lista == null || !lista.isArray() || lista.isEmpty()) {
 
@@ -86,7 +85,7 @@ public class LogisticaClient {
 
         try {
 
-            JsonNode deposito = restClient.get().uri("/depositos/{id}", id).retrieve().body(JsonNode.class);
+            JsonNode deposito = restClient.get().uri("/logistica/depositos/{id}", id).retrieve().body(JsonNode.class);
             if (deposito == null) {
                 return "❌ La API no devolvió los datos del depósito.";
             }
@@ -147,7 +146,7 @@ public class LogisticaClient {
 
         try {
 
-            JsonNode stock = restClient.get().uri("/depositos/{id}/stock", depositoID).retrieve().body(JsonNode.class);
+            JsonNode stock = restClient.get().uri("/logistica/depositos/{id}/stock", depositoID).retrieve().body(JsonNode.class);
 
             if (stock == null || !stock.isArray() || stock.isEmpty()) {
 
@@ -178,7 +177,7 @@ public class LogisticaClient {
 
         try {
 
-            JsonNode lista = restClient.get().uri("/asignaciones").retrieve().body(JsonNode.class);
+            JsonNode lista = restClient.get().uri("/logistica/asignaciones").retrieve().body(JsonNode.class);
 
             if (lista == null || !lista.isArray() || lista.isEmpty()) {
 
@@ -210,7 +209,7 @@ public class LogisticaClient {
 
         try {
 
-            JsonNode lista = restClient.get().uri("/asignaciones/estado/{estado}", estado).retrieve().body(JsonNode.class);
+            JsonNode lista = restClient.get().uri("/logistica/asignaciones/estado/{estado}", estado).retrieve().body(JsonNode.class);
 
             if (lista == null || !lista.isArray() || lista.isEmpty()) {
 
@@ -240,7 +239,7 @@ public class LogisticaClient {
 
         try {
 
-            JsonNode asignacion = restClient.get().uri("/asignaciones/{id}", paqueteID).retrieve().body(JsonNode.class);
+            JsonNode asignacion = restClient.get().uri("/logistica/asignaciones/{id}", paqueteID).retrieve().body(JsonNode.class);
             if (asignacion == null) {
                 return "❌ La API no devolvió los datos de la asignación.";
             }
@@ -270,7 +269,7 @@ public class LogisticaClient {
 
         try {
 
-            String cantidad = restClient.get().uri("/depositos/stock/{productoID}", productoID).retrieve().body(String.class);
+            String cantidad = restClient.get().uri("/logistica/depositos/stock/{productoID}", productoID).retrieve().body(String.class);
 
             return """
                 📦 Stock disponible
@@ -296,7 +295,7 @@ public class LogisticaClient {
 
             Map<String, Object> body = Map.of("nombre", nombre, "direccion", direccion, "capacidadMaxima", capacidadMaxima);
 
-            JsonNode deposito = restClient.post().uri("/depositos").body(Objects.requireNonNull(body)).retrieve().body(JsonNode.class);
+            JsonNode deposito = restClient.post().uri("/logistica/depositos").body(Objects.requireNonNull(body)).retrieve().body(JsonNode.class);
             if (deposito == null) {
                 return "❌ El depósito se creó, pero la API no devolvió sus datos.";
             }
@@ -329,7 +328,7 @@ public class LogisticaClient {
 
             Map<String, String> body = Map.of("algoritmo", algoritmo.toUpperCase());
 
-            restClient.patch().uri("/depositos/{id}/algoritmo", depositoID).body(Objects.requireNonNull(body)).retrieve().toBodilessEntity();
+            restClient.patch().uri("/logistica/depositos/{id}/algoritmo", depositoID).body(Objects.requireNonNull(body)).retrieve().toBodilessEntity();
 
             return "✅ Algoritmo configurado correctamente.";
 
@@ -345,7 +344,7 @@ public class LogisticaClient {
 
         try {
 
-            restClient.delete().uri("/depositos").retrieve().toBodilessEntity();
+            restClient.delete().uri("/logistica/depositos").retrieve().toBodilessEntity();
 
             return "🗑️ Depósitos eliminados correctamente.";
 
@@ -359,7 +358,7 @@ public class LogisticaClient {
 
         try {
 
-            restClient.delete().uri("/asignaciones").retrieve().toBodilessEntity();
+            restClient.delete().uri("/logistica/asignaciones").retrieve().toBodilessEntity();
 
             return "🗑️ Asignaciones eliminadas correctamente.";
 
@@ -373,7 +372,7 @@ public class LogisticaClient {
 
         try {
 
-            restClient.delete().uri("/depositos/stock").retrieve().toBodilessEntity();
+            restClient.delete().uri("/logistica/depositos/stock").retrieve().toBodilessEntity();
 
             return "🗑️ Paquetes eliminados correctamente.";
 
@@ -387,7 +386,7 @@ public class LogisticaClient {
 
         try {
 
-            restClient.delete().uri("/depositos/{id}/stock", depositoID).retrieve().toBodilessEntity();
+            restClient.delete().uri("/logistica/depositos/{id}/stock", depositoID).retrieve().toBodilessEntity();
 
             return "🗑️ Stock vaciado correctamente.";
 

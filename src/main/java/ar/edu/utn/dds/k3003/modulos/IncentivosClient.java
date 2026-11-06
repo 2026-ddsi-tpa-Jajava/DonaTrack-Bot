@@ -18,8 +18,8 @@ public class IncentivosClient {
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
 
-    public IncentivosClient(@Value("${incentivos.url:https://incentivos-yuse.onrender.com}") String baseUrl) {
-        String urlValida = (baseUrl != null) ? baseUrl : "https://incentivos-yuse.onrender.com";
+    public IncentivosClient(@Value("${api.gateway.url}") String baseUrl) {
+        String urlValida = (baseUrl != null && !baseUrl.isBlank()) ? baseUrl : "http://localhost:8080";
         this.restClient = RestClient.create(urlValida);
         this.objectMapper = new ObjectMapper();
     }
@@ -27,7 +27,7 @@ public class IncentivosClient {
     public String consultarEstado(String donadorID) {
         try {
             String jsonBody = restClient.get()
-                    .uri("/donadores/{id}/estado", donadorID)
+                    .uri("/incentivos/donadores/{id}/estado", donadorID)
                     .retrieve()
                     .body(String.class);
 
@@ -99,7 +99,7 @@ public class IncentivosClient {
 
         try {
             JsonNode insigniaJson = restClient.get()
-                    .uri("/insignias/{id}", id)
+                    .uri("/incentivos/insignias/{id}", id)
                     .retrieve()
                     .body(JsonNode.class);
 
