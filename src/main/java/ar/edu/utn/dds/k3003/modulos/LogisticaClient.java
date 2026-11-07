@@ -395,4 +395,21 @@ public class LogisticaClient {
             return "❌ No se pudo vaciar el stock.";
         }
     }
+
+
+    public String reportarEntrega(String paqueteID, String donacionID, String productoID, Integer cantidad) {
+
+        try {
+
+            Map<String, Object> body = Map.of("id", paqueteID, "donacionID", donacionID, "producto", productoID, "cantidad", cantidad);
+
+            restClient.post().uri("/logistica/entregas").body(body).retrieve().toBodilessEntity();
+
+            return "✅ Entrega reportada correctamente.";
+
+        } catch (Exception e) {
+
+            return "❌ No se pudo reportar la entrega.";
+        }
+    }
 }

@@ -158,6 +158,7 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
             case "/vaciarstock" -> procesarVaciarStock(text);
             case "/configuraralgoritmo" -> procesarConfigurarAlgoritmo(text);
             case "/asignacion" -> procesarConsultarAsignacion(text);
+            case "/reportarentrega" -> procesarReportarEntrega(text);
 
             // ---------- Donaciones ----------
             case "/donar" -> procesarDonar(text);
@@ -233,6 +234,7 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
             🗑️ /eliminarpaquetes
             🗑️ /eliminarasignaciones
             🗑️ /eliminardepositos
+            🚚 /reportarentrega PaqueteID|DonacionID|ProductoID|Cantidad
 
             🎁 *Donaciones*
             📋 /donaciones — Listar donaciones
@@ -705,6 +707,35 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
 
         return logisticaClient.consultarAsignacionPorPaquete(partes[1]);
 
+    }
+
+    private String procesarReportarEntrega(String text) {
+
+        String[] campos = extraerArgumentos(text);
+
+        if (campos.length != 4) {
+
+            return """
+                ⚠️ Formato incorrecto.
+
+                Ejemplo:
+
+                /reportarentrega 1|25|3|10
+                """;
+        }
+
+        try {
+
+            Integer cantidad = Integer.parseInt(campos[3].trim());
+
+            return logisticaClient.reportarEntrega(campos[0].trim(), campos[1].trim(), campos[2].trim(), cantidad);
+
+        } catch (NumberFormatException e) {
+
+            return """
+                ⚠️ La cantidad debe ser numérica.
+                """;
+        }
     }
 
     // ==================== Donaciones (Nuevos Métodos) ====================
