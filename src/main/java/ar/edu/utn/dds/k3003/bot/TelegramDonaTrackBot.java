@@ -234,7 +234,7 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
             🗑️ /eliminarpaquetes
             🗑️ /eliminarasignaciones
             🗑️ /eliminardepositos
-            🚚 /reportarentrega PaqueteID|DonacionID|ProductoID|Cantidad
+            🚚 /reportarentrega — Reportar una entrega
 
             🎁 *Donaciones*
             📋 /donaciones — Listar donaciones
@@ -255,11 +255,11 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
     // ==================== Incentivos ====================
 
     private String procesarComandoStats(String text) {
-        String[] partes = text.split("\\s+");
-        if (partes.length < 2) {
-            return "⚠️ Indicá el ID de donador.\nEjemplo: `/stats 1`";
+        String[] campos = extraerArgumentos(text);
+        if (campos.length < 1) {
+            return "⚠️ No hay una consulta en curso. Escribí `/stats` para comenzar.";
         }
-        String donadorId = partes[1];
+        String donadorId = campos[0].trim();
         log.info("[TELEGRAM_BOT] Consultando estado en Incentivos para donadorId={}", donadorId);
         String resultado = incentivosClient.consultarEstado(donadorId);
         return "📊 Estado de Incentivos:\n\n" + resultado;
@@ -335,7 +335,12 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
             case "/crearentidad", "/crearnecesidad", "/creardeposito",
                     "/configuraralgoritmo", "/donar", "/queja",
                     "/crearcategoria", "/crearproducto",
-                    "/crearidentificador", "/crearsubcategoria" -> true;
+                    "/crearidentificador", "/crearsubcategoria",
+                    "/reportarentrega",
+                    "/stats", "/misestadisticas", "/verdonador", "/verentidad",
+                    "/necesidades", "/borrarnecesidad", "/consultarnecesidad",
+                    "/deposito", "/stock", "/stockproducto", "/vaciarstock",
+                    "/asignacion", "/verdonacion", "/subcategorias" -> true;
             default -> false;
         };
     }
@@ -393,6 +398,11 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
             case "/configuraralgoritmo", "/queja", "/crearcategoria",
                     "/crearsubcategoria", "/crearidentificador" -> 2;
             case "/crearproducto" -> 4;
+            case "/reportarentrega" -> 4;
+            case "/stats", "/misestadisticas", "/verdonador", "/verentidad",
+                    "/necesidades", "/borrarnecesidad", "/consultarnecesidad",
+                    "/deposito", "/stock", "/stockproducto", "/vaciarstock",
+                    "/asignacion", "/verdonacion", "/subcategorias" -> 1;
             default -> 0;
         };
     }
@@ -400,7 +410,8 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
     private boolean requiereNumero(String comando, int paso) {
         return ("/crearnecesidad".equals(comando) && (paso == 1 || paso == 3))
                 || ("/creardeposito".equals(comando) && paso == 2)
-                || ("/donar".equals(comando) && paso == 4);
+                || ("/donar".equals(comando) && paso == 4)
+                || ("/reportarentrega".equals(comando) && paso == 3);
     }
 
     private String preguntaFormulario(String comando, int paso) {
@@ -433,6 +444,12 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
                 case 3 -> "¿Cuál es el ID del producto?";
                 default -> "¿Qué cantidad vas a donar? (número)";
             };
+            case "/reportarentrega" -> switch (paso) {
+                case 0 -> "¿Cuál es el ID del paquete?";
+                case 1 -> "¿Cuál es el ID de la donación?";
+                case 2 -> "¿Cuál es el ID del producto?";
+                default -> "¿Qué cantidad se entregó? (número)";
+            };
             case "/queja" -> paso == 0 ? "¿Cuál es el ID de la donación?" : "¿Cuál es la descripción de la queja?";
             case "/crearcategoria" -> paso == 0 ? "¿Cuál es el nombre de la categoría?" : "¿Cuál es la descripción?";
             case "/crearproducto" -> switch (paso) {
@@ -443,24 +460,35 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
             };
             case "/crearidentificador" -> paso == 0 ? "¿Qué tipo de identificador es? (QR o CODIGODEBARRAS)" : "¿Cuál es la descripción?";
             case "/crearsubcategoria" -> paso == 0 ? "¿Cuál es el nombre de la subcategoría?" : "¿Cuál es el ID de la categoría?";
+            case "/stats" -> "¿Cuál es el ID del donador?";
+            case "/misestadisticas" -> "¿Cuál es tu ID de donador?";
+            case "/verdonador" -> "¿Cuál es el ID del donador?";
+            case "/verentidad" -> "¿Cuál es el ID de la entidad?";
+            case "/necesidades" -> "¿Cuál es el ID del producto?";
+            case "/borrarnecesidad", "/consultarnecesidad" -> "¿Cuál es el ID de la necesidad?";
+            case "/deposito", "/stock", "/vaciarstock" -> "¿Cuál es el ID del depósito?";
+            case "/stockproducto" -> "¿Cuál es el ID del producto?";
+            case "/asignacion" -> "¿Cuál es el ID del paquete?";
+            case "/verdonacion" -> "¿Cuál es el ID de la donación?";
+            case "/subcategorias" -> "¿Cuál es el ID de la categoría padre?";
             default -> "Ingresá el valor solicitado.";
         };
     }
 
     private String procesarMisEstadisticas(String text) {
-        String[] partes = text.split("\\s+");
-        if (partes.length < 2) {
-            return "⚠️ Indicá tu ID de donador.\nEjemplo: `/misestadisticas 1`";
+        String[] campos = extraerArgumentos(text);
+        if (campos.length < 1) {
+            return "⚠️ No hay una consulta en curso. Escribí `/misestadisticas` para comenzar.";
         }
-        return donadoresYEntidadesClient.consultarEstadisticas(partes[1]);
+        return donadoresYEntidadesClient.consultarEstadisticas(campos[0].trim());
     }
 
     private String procesarVerDonador(String text) {
-        String[] partes = text.split("\\s+");
-        if (partes.length < 2) {
-            return "⚠️ Indicá el ID del donador.\nEjemplo: `/verdonador 1`";
+        String[] campos = extraerArgumentos(text);
+        if (campos.length < 1) {
+            return "⚠️ No hay una consulta en curso. Escribí `/verdonador` para comenzar.";
         }
-        return donadoresYEntidadesClient.consultarDonadorPorId(partes[1]);
+        return donadoresYEntidadesClient.consultarDonadorPorId(campos[0].trim());
     }
 
     // ==================== Entidades ====================
@@ -501,11 +529,11 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
     }
 
     private String procesarVerEntidad(String text) {
-        String[] partes = text.split("\\s+");
-        if (partes.length < 2) {
-            return "⚠️ Indicá el ID de la entidad.\nEjemplo: `/verentidad 1`";
+        String[] campos = extraerArgumentos(text);
+        if (campos.length < 1) {
+            return "⚠️ No hay una consulta en curso. Escribí `/verentidad` para comenzar.";
         }
-        return donadoresYEntidadesClient.consultarEntidadPorId(partes[1]);
+        return donadoresYEntidadesClient.consultarEntidadPorId(campos[0].trim());
     }
 
     // ==================== Necesidades ====================
@@ -527,19 +555,19 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
     }
 
     private String procesarNecesidadesPorProducto(String text) {
-        String[] partes = text.split("\\s+");
-        if (partes.length < 2) {
-            return "⚠️ Indicá el ID del producto.\nEjemplo: `/necesidades prod-1`";
+        String[] campos = extraerArgumentos(text);
+        if (campos.length < 1) {
+            return "⚠️ No hay una consulta en curso. Escribí `/necesidades` para comenzar.";
         }
-        return donadoresYEntidadesClient.consultarNecesidadesPorProducto(partes[1]);
+        return donadoresYEntidadesClient.consultarNecesidadesPorProducto(campos[0].trim());
     }
 
     private String procesarBorrarNecesidad(String text) {
-        String[] partes = text.split("\\s+");
-        if (partes.length < 2) {
-            return "⚠️ Indicá el ID de la necesidad.\nEjemplo: `/borrarnecesidad nec-1`";
+        String[] campos = extraerArgumentos(text);
+        if (campos.length < 1) {
+            return "⚠️ No hay una operación en curso. Escribí `/borrarnecesidad` para comenzar.";
         }
-        return donadoresYEntidadesClient.borrarNecesidad(partes[1]);
+        return donadoresYEntidadesClient.borrarNecesidad(campos[0].trim());
     }
 
     private String procesarModificarNecesidad(String text) {
@@ -567,11 +595,11 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
     }
 
     private String procesarConsultarNecesidad(String text) {
-        String[] partes = text.split("\\s+");
-        if (partes.length < 2) {
-            return "⚠️ Indicá el ID de la necesidad.\nEjemplo: `/consultarnecesidad nec-1`";
+        String[] campos = extraerArgumentos(text);
+        if (campos.length < 1) {
+            return "⚠️ No hay una consulta en curso. Escribí `/consultarnecesidad` para comenzar.";
         }
-        return donadoresYEntidadesClient.consultarNecesidadPorId(partes[1]);
+        return donadoresYEntidadesClient.consultarNecesidadPorId(campos[0].trim());
     }
 
     // ==================== Logistica ====================
@@ -603,74 +631,42 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
     }
 
     private String procesarConsultarDeposito(String text) {
-
-        String[] partes = text.split("\\s+");
-
-        if (partes.length < 2) {
-
-            return """
-                ⚠️ Indicá el ID del depósito.
-
-                Ejemplo:
-                /deposito 1
-                """;
+        String[] campos = extraerArgumentos(text);
+        if (campos.length < 1) {
+            return "⚠️ No hay una consulta en curso. Escribí `/deposito` para comenzar.";
         }
 
-        return logisticaClient.consultarDepositoPorId(partes[1]);
+        return logisticaClient.consultarDepositoPorId(campos[0].trim());
 
     }
 
     private String procesarConsultarStock(String text) {
-
-        String[] partes = text.split("\\s+");
-
-        if (partes.length < 2) {
-
-            return """
-                ⚠️ Indicá el ID del depósito.
-
-                Ejemplo:
-                /stock 1
-                """;
+        String[] campos = extraerArgumentos(text);
+        if (campos.length < 1) {
+            return "⚠️ No hay una consulta en curso. Escribí `/stock` para comenzar.";
         }
 
-        return logisticaClient.consultarStock(partes[1]);
+        return logisticaClient.consultarStock(campos[0].trim());
 
     }
 
     private String procesarConsultarStockProducto(String text) {
-
-        String[] partes = text.split("\\s+");
-
-        if (partes.length < 2) {
-
-            return """
-                ⚠️ Indicá el ID del producto.
-
-                Ejemplo:
-                /stockproducto 4
-                """;
+        String[] campos = extraerArgumentos(text);
+        if (campos.length < 1) {
+            return "⚠️ No hay una consulta en curso. Escribí `/stockproducto` para comenzar.";
         }
 
-        return logisticaClient.consultarStockProducto(partes[1]);
+        return logisticaClient.consultarStockProducto(campos[0].trim());
 
     }
 
     private String procesarVaciarStock(String text) {
-
-        String[] partes = text.split("\\s+");
-
-        if (partes.length < 2) {
-
-            return """
-                ⚠️ Indicá el ID del depósito.
-
-                Ejemplo:
-                /vaciarstock 2
-                """;
+        String[] campos = extraerArgumentos(text);
+        if (campos.length < 1) {
+            return "⚠️ No hay una operación en curso. Escribí `/vaciarstock` para comenzar.";
         }
 
-        return logisticaClient.vaciarStock(partes[1]);
+        return logisticaClient.vaciarStock(campos[0].trim());
 
     }
 
@@ -692,20 +688,12 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
     }
 
     private String procesarConsultarAsignacion(String text) {
-
-        String[] partes = text.split("\\s+");
-
-        if (partes.length < 2) {
-
-            return """
-                ⚠️ Indicá el ID del paquete.
-
-                Ejemplo:
-                /asignacion 1
-                """;
+        String[] campos = extraerArgumentos(text);
+        if (campos.length < 1) {
+            return "⚠️ No hay una consulta en curso. Escribí `/asignacion` para comenzar.";
         }
 
-        return logisticaClient.consultarAsignacionPorPaquete(partes[1]);
+        return logisticaClient.consultarAsignacionPorPaquete(campos[0].trim());
 
     }
 
@@ -714,14 +702,7 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
         String[] campos = extraerArgumentos(text);
 
         if (campos.length != 4) {
-
-            return """
-                ⚠️ Formato incorrecto.
-
-                Ejemplo:
-
-                /reportarentrega 1|25|3|10
-                """;
+            return "⚠️ Para reportar una entrega, escribí `/reportarentrega` y respondé las preguntas.";
         }
 
         try {
@@ -755,11 +736,11 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
     }
 
     private String procesarVerDonacion(String text) {
-        String[] partes = text.split("\\s+");
-        if (partes.length < 2) {
-            return "⚠️ Indicá el ID de la donación.\nEjemplo: `/verdonacion 1`";
+        String[] campos = extraerArgumentos(text);
+        if (campos.length < 1) {
+            return "⚠️ No hay una consulta en curso. Escribí `/verdonacion` para comenzar.";
         }
-        return donacionesClient.consultarDonacionPorId(partes[1].trim());
+        return donacionesClient.consultarDonacionPorId(campos[0].trim());
     }
 
     private String procesarQueja(String text) {
@@ -804,11 +785,11 @@ public class TelegramDonaTrackBot extends TelegramLongPollingBot {
     }
 
     private String procesarConsultarSubcategorias(String text) {
-        String[] partes = text.split("\\s+");
-        if (partes.length < 2) {
-            return "⚠️ Indicá el ID de la categoría padre.\nEjemplo: `/subcategorias 1`";
+        String[] campos = extraerArgumentos(text);
+        if (campos.length < 1) {
+            return "⚠️ No hay una consulta en curso. Escribí `/subcategorias` para comenzar.";
         }
-        return donacionesClient.consultarSubcategorias(partes[1].trim());
+        return donacionesClient.consultarSubcategorias(campos[0].trim());
     }
 
     // ==================== Utilidades ====================
